@@ -444,34 +444,43 @@ async def startup_event():
     """Initialize the application on startup"""
     logger.info("CryptoRebound Ranking API starting up...")
     
-    # Do an initial data refresh in the background
+    # Initialize the database connection for precomputation service
+    data_service.set_db_client(client)
+    
+    # Do an initial data refresh and precomputation in the background
     try:
-        cryptos = await data_service.get_aggregated_crypto_data(force_refresh=True)
+        # Quick health check
+        health_status = data_service.is_healthy()
+        logger.info(f"Service health check: {health_status}")
+        
+        # Start background precomputation for better performance
+        if hasattr(data_service, 'precompute_service'):
+            logger.info("Starting background precomputation of rankings...")
+            asyncio.create_task(data_service.precompute_service.schedule_background_precomputation())
+        
+        # Do initial data aggregation (lightweight)
+        cryptos = await data_service.get_aggregated_crypto_data(force_refresh=False)
+        
         if cryptos:
-            # Calculate initial rankings for main periods
-            for period in ['24h', '7d']:
-                scored_cryptos = scoring_service.calculate_scores(cryptos.copy(), period)
-                rankings_cache[period] = scored_cryptos
-                last_cache_update[period] = datetime.utcnow()
-                
-                # Save initial data to database
-                ranking = CryptoRanking(
-                    period=period,
-                    cryptos=scored_cryptos,
-                    total_cryptos=len(scored_cryptos)
-                )
-                await db.crypto_rankings.replace_one(
-                    {"period": period},
-                    ranking.dict(),
-                    upsert=True
-                )
+            logger.info(f"Initial data loaded: {len(cryptos)} cryptocurrencies available")
             
-            logger.info(f"Initial data loaded: {len(cryptos)} cryptocurrencies")
+            # Cache some basic rankings
+            for period in ['24h', '7d']:
+                try:
+                    scored_cryptos = scoring_service.calculate_scores(cryptos[:100].copy(), period)  # Limit for startup
+                    rankings_cache[period] = scored_cryptos
+                    last_cache_update[period] = datetime.utcnow()
+                    logger.info(f"Cached ranking for {period}: {len(scored_cryptos)} cryptos")
+                except Exception as e:
+                    logger.warning(f"Failed to cache ranking for {period}: {e}")
         else:
             logger.warning("No initial cryptocurrency data available")
             
+        logger.info("CryptoRebound Ranking API startup completed successfully")
+        
     except Exception as e:
         logger.error(f"Error during startup data initialization: {e}")
+        # Don't fail the startup, just log the error
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
