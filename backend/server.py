@@ -608,18 +608,33 @@ async def startup_event():
     # Initialize the database connection for precomputation service
     data_service.set_db_client(client)
     
-    # Do an initial data refresh and precomputation in the background
+    # Do a quick health check and start background tasks
     try:
         # Quick health check
         health_status = data_service.is_healthy()
         logger.info(f"Service health check: {health_status}")
+        
+        # Start background data loading and precomputation (non-blocking)
+        asyncio.create_task(background_startup_tasks())
+        
+        logger.info("CryptoRebound Ranking API startup completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Error during startup initialization: {e}")
+        # Don't fail the startup, just log the error
+
+async def background_startup_tasks():
+    """Background tasks that run after startup to avoid blocking server start"""
+    try:
+        logger.info("Starting background startup tasks...")
         
         # Start background precomputation for better performance
         if hasattr(data_service, 'precompute_service'):
             logger.info("Starting background precomputation of rankings...")
             asyncio.create_task(data_service.precompute_service.schedule_background_precomputation())
         
-        # Do initial data aggregation (lightweight)
+        # Do initial data aggregation (this can take time)
+        logger.info("Loading initial cryptocurrency data...")
         cryptos = await data_service.get_aggregated_crypto_data(force_refresh=False)
         
         if cryptos:
@@ -637,11 +652,11 @@ async def startup_event():
         else:
             logger.warning("No initial cryptocurrency data available")
             
-        logger.info("CryptoRebound Ranking API startup completed successfully")
+        logger.info("Background startup tasks completed successfully")
         
     except Exception as e:
-        logger.error(f"Error during startup data initialization: {e}")
-        # Don't fail the startup, just log the error
+        logger.error(f"Error during background startup tasks: {e}")
+        # Don't fail, just log the error
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
