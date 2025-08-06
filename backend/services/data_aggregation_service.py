@@ -28,6 +28,7 @@ class DataAggregationService:
         self.db_cache = DatabaseCacheService(db_client)
         self.enrichment_service = DataEnrichmentService(self.db_cache)
         self.precompute_service = RankingPrecomputeService(self.db_cache, None)  # Will set scoring_service later
+        self.historical_price_service = HistoricalPriceService()  # NEW SERVICE
         
         # Configuration
         self.last_update = None
