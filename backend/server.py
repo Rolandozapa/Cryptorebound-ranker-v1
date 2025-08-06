@@ -748,7 +748,7 @@ async def get_crypto_ranking(
                 end_index = offset + limit
                 result = scored_cryptos[offset:end_index]
         
-        logger.info(f"Returning {len(result)} ranked cryptocurrencies for {period}")
+        logger.info(f"Returning {len(result)} ranked cryptocurrencies with enhanced historical data for {period}")
         return result
         
     except Exception as e:
