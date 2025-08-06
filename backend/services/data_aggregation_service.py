@@ -153,12 +153,14 @@ class DataAggregationService:
                 del self.background_refresh_tasks[task_id]
     
     async def _fetch_fresh_data_parallel(self) -> List[Dict[str, Any]]:
-        """Fetch data from all 7 sources in parallel for maximum coverage and reliability"""
+        """Fetch data from all 8 sources in parallel with maximum performance optimization"""
         try:
-            # Create tasks for parallel execution with intelligent prioritization
+            # Create tasks for parallel execution with intelligent prioritization and concurrency control
             tasks = []
             
-            # Tier 1: Premium/Most reliable sources
+            # Tier 1: Premium/Most reliable sources (priorité absolue)
+            if self.coinmarketcap_service.is_available():
+                tasks.append(('coinmarketcap', self._get_coinmarketcap_data()))
             tasks.append(('cryptocompare', self._get_cryptocompare_data()))
             if self.coinapi_service.is_available():
                 tasks.append(('coinapi', self._get_coinapi_data()))
@@ -172,42 +174,60 @@ class DataAggregationService:
                 tasks.append(('binance', self._get_binance_data()))
             tasks.append(('yahoo', self._get_yahoo_data()))
             
-            # Tier 4: Fallback sources
+            # Tier 4: Fallback sources (only if we need more data)
             tasks.append(('fallback', self._get_fallback_data()))
             
-            # Execute all tasks in parallel with timeout
-            logger.info(f"Starting {len(tasks)} parallel API requests across 7 data sources")
+            # Execute all tasks in parallel with controlled concurrency and timeout
+            logger.info(f"Starting {len(tasks)} high-performance parallel API requests across 8 data sources")
             
-            # Execute tasks
-            task_results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
+            # Use semaphore to control concurrency and prevent overwhelming APIs
+            async def controlled_request(task_info):
+                source_name, coro = task_info
+                async with self.request_semaphore:
+                    try:
+                        return await asyncio.wait_for(coro, timeout=20)  # 20s timeout per API
+                    except asyncio.TimeoutError:
+                        logger.warning(f"API source {source_name} timed out after 20s")
+                        return []
+                    except Exception as e:
+                        logger.warning(f"API source {source_name} failed: {e}")
+                        return []
+            
+            # Execute tasks with controlled concurrency
+            start_time = asyncio.get_event_loop().time()
+            task_results = await asyncio.gather(*[controlled_request(task) for task in tasks], return_exceptions=True)
+            total_time = asyncio.get_event_loop().time() - start_time
             
             # Combine results with enhanced priority system
             all_crypto_data = {}
             source_priority = {
-                'cryptocompare': 1,  # Highest priority - proven reliability
-                'coinapi': 2,        # Premium service with API key
-                'coinpaprika': 3,    # Comprehensive free API
-                'bitfinex': 4,       # Exchange data, good for major cryptos
-                'binance': 5,        # Exchange data, reliable for top cryptos
-                'yahoo': 6,          # Solid mainstream source
-                'fallback': 7        # CoinGecko/Coinlore as last resort
+                'coinmarketcap': 1,  # Highest priority - industry standard
+                'cryptocompare': 2,  # Second highest - proven reliability
+                'coinapi': 3,        # Premium service
+                'coinpaprika': 4,    # Comprehensive free API
+                'bitfinex': 5,       # Exchange data, good for major cryptos
+                'binance': 6,        # Exchange data, reliable for top cryptos
+                'yahoo': 7,          # Solid mainstream source
+                'fallback': 8        # CoinGecko/Coinlore as last resort
             }
             
             # Track source performance
             successful_sources = []
             failed_sources = []
+            total_cryptos_fetched = 0
             
             for i, (source_name, _) in enumerate(tasks):
                 result = task_results[i]
                 
                 if isinstance(result, Exception):
-                    logger.warning(f"API source {source_name} failed: {result}")
+                    logger.warning(f"API source {source_name} failed with exception: {result}")
                     failed_sources.append(source_name)
                     continue
                 
                 if isinstance(result, list) and len(result) > 0:
                     logger.info(f"Processing {len(result)} cryptos from {source_name}")
                     successful_sources.append(f"{source_name}({len(result)})")
+                    total_cryptos_fetched += len(result)
                     
                     for crypto_data in result:
                         symbol = crypto_data.get('symbol', '').upper()
@@ -221,6 +241,7 @@ class DataAggregationService:
                             # First time seeing this crypto
                             crypto_data['primary_source'] = source_name
                             crypto_data['source_priority'] = current_priority
+                            crypto_data['fetch_time'] = total_time
                             all_crypto_data[symbol] = crypto_data
                         else:
                             # Merge data, keeping higher priority source as primary
@@ -231,6 +252,7 @@ class DataAggregationService:
                                 merged_data = self._merge_crypto_data(all_crypto_data[symbol], crypto_data)
                                 merged_data['primary_source'] = source_name
                                 merged_data['source_priority'] = current_priority
+                                merged_data['fetch_time'] = total_time
                                 all_crypto_data[symbol] = merged_data
                             else:
                                 # Keep existing primary, but merge useful data
@@ -244,17 +266,21 @@ class DataAggregationService:
             
             result_list = list(all_crypto_data.values())
             
-            # Sort by priority and market cap
+            # Sort by priority and market cap for best quality first
             result_list.sort(key=lambda x: (
                 x.get('source_priority', 999),
                 -(x.get('market_cap_usd', 0) or 0)
             ))
             
-            logger.info(f"Enhanced parallel fetch completed: {len(result_list)} unique cryptocurrencies")
-            logger.info(f"Successful sources: {', '.join(successful_sources)}")
+            # Performance metrics
+            performance_grade = "Excellent" if total_time < 10 else "Good" if total_time < 20 else "Acceptable"
+            
+            logger.info(f"🚀 Enhanced parallel fetch completed in {total_time:.2f}s ({performance_grade})")
+            logger.info(f"📊 Results: {len(result_list)} unique cryptos from {total_cryptos_fetched} total fetched")
+            logger.info(f"✅ Successful sources ({len(successful_sources)}): {', '.join(successful_sources)}")
             if failed_sources:
-                logger.info(f"Failed sources: {', '.join(failed_sources)}")
-            logger.info(f"Source distribution: {self._get_source_distribution(result_list)}")
+                logger.info(f"❌ Failed sources ({len(failed_sources)}): {', '.join(failed_sources)}")
+            logger.info(f"🎯 Source distribution: {self._get_source_distribution(result_list)}")
             
             return result_list
             
