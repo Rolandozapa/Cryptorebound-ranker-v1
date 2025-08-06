@@ -13,19 +13,40 @@ class BinanceService:
     def __init__(self):
         self.api_key = os.environ.get('BINANCE_API_KEY', '')
         self.api_secret = os.environ.get('BINANCE_SECRET_KEY', '')
+        self.client = None
+        self.is_available_cached = None
         
-        # Initialize client - for public data, no keys needed
+        # Try to initialize client gracefully
         try:
             if self.api_key:
                 self.client = Client(self.api_key, self.api_secret)
             else:
                 self.client = Client()  # Public client only
+            
+            # Test connectivity immediately
+            self.client.ping()
+            self.is_available_cached = True
+            logger.info("Binance service initialized successfully")
+            
+        except BinanceAPIException as e:
+            if "restricted location" in str(e).lower():
+                logger.warning("Binance API not available in this region - service disabled")
+            else:
+                logger.warning(f"Binance API error during init: {e}")
+            self.client = None
+            self.is_available_cached = False
+            
         except Exception as e:
-            logger.warning(f"Binance client init failed: {e}. Using public endpoints only.")
-            self.client = Client()
+            logger.warning(f"Binance client init failed: {e}. Service disabled.")
+            self.client = None
+            self.is_available_cached = False
     
     async def get_all_tickers(self) -> List[Dict[str, Any]]:
         """Get all ticker prices from Binance"""
+        if not self.is_available():
+            logger.info("Binance service not available, returning empty list")
+            return []
+            
         try:
             loop = asyncio.get_event_loop()
             tickers = await loop.run_in_executor(None, self.client.get_all_tickers)
@@ -67,6 +88,9 @@ class BinanceService:
     
     async def get_24hr_ticker_stats(self) -> List[Dict[str, Any]]:
         """Get 24hr ticker statistics"""
+        if not self.is_available():
+            return []
+            
         try:
             loop = asyncio.get_event_loop()
             stats = await loop.run_in_executor(None, self.client.get_ticker)
@@ -100,6 +124,9 @@ class BinanceService:
     
     async def get_historical_klines(self, symbol: str, interval: str = '1d', limit: int = 365) -> List[Dict]:
         """Get historical kline/candlestick data"""
+        if not self.is_available():
+            return []
+            
         try:
             full_symbol = f"{symbol}USDT"
             loop = asyncio.get_event_loop()
@@ -130,9 +157,17 @@ class BinanceService:
     
     def is_available(self) -> bool:
         """Check if Binance service is available"""
+        if self.is_available_cached is not None:
+            return self.is_available_cached
+            
+        if not self.client:
+            return False
+            
         try:
             # Test with a simple ping
             self.client.ping()
+            self.is_available_cached = True
             return True
         except Exception:
+            self.is_available_cached = False
             return False
