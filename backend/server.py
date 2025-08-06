@@ -192,8 +192,91 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
 
 # New CryptoRebound endpoints
 
-@api_router.get("/health")
-async def health_check():
+@api_router.get("/system/dynamic-limit", response_model=DynamicLimitResponse)
+async def get_dynamic_analysis_limit():
+    """Get dynamic analysis limit based on current system resources and memory"""
+    try:
+        # Get system resources
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=1)
+        available_memory_mb = memory.available / (1024 * 1024)
+        
+        # Calculate recommended limits based on available memory
+        # Estimate: each crypto uses ~1KB in memory for analysis
+        base_crypto_memory_kb = 1  # Base memory per crypto
+        memory_safety_factor = 0.7  # Use 70% of available memory max
+        
+        # Memory-based calculation
+        memory_based_limit = int((available_memory_mb * 1024 * memory_safety_factor) / base_crypto_memory_kb)
+        
+        # Performance-based recommendations
+        if cpu_percent > 80:
+            performance_factor = 0.5  # High CPU usage, reduce limit
+            performance_mode = "optimal"
+            current_load = "high"
+        elif cpu_percent > 50:
+            performance_factor = 0.8  # Medium CPU usage
+            performance_mode = "balanced" 
+            current_load = "medium"
+        else:
+            performance_factor = 1.0  # Low CPU usage, allow full capacity
+            performance_mode = "maximum"
+            current_load = "low"
+        
+        # Final recommended limit
+        recommended_limit = min(
+            int(memory_based_limit * performance_factor),
+            5000  # Hard upper limit for safety
+        )
+        
+        # Ensure minimum viable limit
+        recommended_limit = max(recommended_limit, 100)
+        
+        # Performance impact assessment
+        if recommended_limit >= 2000:
+            performance_impact = "low"
+            memory_usage = "< 10MB estimated"
+        elif recommended_limit >= 1000:
+            performance_impact = "medium"
+            memory_usage = "5-10MB estimated"
+        else:
+            performance_impact = "high"
+            memory_usage = "< 5MB estimated"
+        
+        system_info = SystemResourcesInfo(
+            available_memory_mb=round(available_memory_mb, 2),
+            cpu_usage_percent=round(cpu_percent, 2),
+            recommended_max_cryptos=recommended_limit,
+            performance_mode=performance_mode,
+            current_load=current_load
+        )
+        
+        logger.info(f"Dynamic limit calculated: {recommended_limit} cryptos (Memory: {available_memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%)")
+        
+        return DynamicLimitResponse(
+            max_recommended_limit=recommended_limit,
+            performance_impact=performance_impact,
+            memory_usage_estimate=memory_usage,
+            system_resources=system_info
+        )
+        
+    except Exception as e:
+        logger.error(f"Error calculating dynamic limit: {e}")
+        # Fallback to safe defaults
+        return DynamicLimitResponse(
+            max_recommended_limit=1000,
+            performance_impact="medium", 
+            memory_usage_estimate="< 5MB estimated",
+            system_resources=SystemResourcesInfo(
+                available_memory_mb=0.0,
+                cpu_usage_percent=0.0,
+                recommended_max_cryptos=1000,
+                performance_mode="balanced",
+                current_load="unknown"
+            )
+        )
+
+# New CryptoRebound endpoints
     """Check the health of all data services"""
     health_status = data_service.is_healthy()
     return {
