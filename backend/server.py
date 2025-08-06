@@ -65,6 +65,16 @@ async def get_status_checks():
 
 # New CryptoRebound endpoints
 
+@api_router.get("/health")
+async def health_check():
+    """Check the health of all data services"""
+    health_status = data_service.is_healthy()
+    return {
+        "status": "healthy",
+        "services": health_status,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
 @api_router.get("/database/stats")
 async def get_database_stats():
     """Get detailed database statistics"""
