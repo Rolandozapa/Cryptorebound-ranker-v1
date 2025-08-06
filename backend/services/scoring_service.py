@@ -263,26 +263,95 @@ class ScoringService:
             return 50.0
     
     def _fast_momentum_score(self, crypto: CryptoCurrency, period: str) -> float:
-        """Optimized momentum score calculation"""
+        """Optimized momentum score calculation - NOW PERIOD-AWARE"""
         try:
-            # Quick momentum calculation
-            short_term = crypto.percent_change_24h or 0
-            medium_term = crypto.percent_change_7d or 0
+            # Period-specific momentum calculation for more accurate differentiation
+            if period == '1h':
+                # For 1h, focus on very recent momentum
+                short_term = crypto.percent_change_1h or 0
+                reference = crypto.percent_change_24h or 0
+                momentum_trend = short_term - (reference / 24)  # Hourly average from daily
+                
+            elif period == '24h':
+                # Standard 24h momentum vs weekly trend
+                short_term = crypto.percent_change_24h or 0
+                reference = crypto.percent_change_7d or 0
+                momentum_trend = short_term - (reference / 7)  # Daily average from weekly
+                
+            elif period == '7d':
+                # Weekly momentum vs monthly trend
+                short_term = crypto.percent_change_7d or 0
+                reference = crypto.percent_change_30d or 0
+                momentum_trend = short_term - (reference / 4.3)  # Weekly average from monthly
+                
+            elif period == '30d':
+                # Monthly momentum - compare recent vs longer term
+                short_term = crypto.percent_change_30d or 0
+                reference_7d = crypto.percent_change_7d or 0
+                # Calculate if recent 7d performance is accelerating the 30d trend
+                if reference_7d != 0:
+                    expected_7d_from_30d = short_term / 4.3
+                    momentum_trend = reference_7d - expected_7d_from_30d
+                else:
+                    momentum_trend = short_term * 0.1  # Conservative momentum for 30d
+                    
+            elif period in ['90d', '180d', '270d', '365d']:
+                # Long-term momentum - focus on sustained trends
+                reference_30d = crypto.percent_change_30d or 0
+                reference_7d = crypto.percent_change_7d or 0
+                
+                # For long periods, we want consistent momentum, not spikes
+                if reference_30d != 0 and reference_7d != 0:
+                    # Check if recent trend aligns with longer trend
+                    expected_weekly_from_monthly = reference_30d / 4.3
+                    consistency = 1 - abs(reference_7d - expected_weekly_from_monthly) / max(abs(expected_weekly_from_monthly), 1)
+                    momentum_trend = reference_30d * 0.3 * max(0, consistency)
+                else:
+                    momentum_trend = reference_30d * 0.2 if reference_30d else 0
+                    
+            else:
+                # Default fallback
+                short_term = crypto.percent_change_24h or 0
+                medium_term = crypto.percent_change_7d or 0
+                momentum_trend = short_term - (medium_term / 7)
             
-            momentum_trend = short_term - (medium_term / 7)
-            
-            # Volume factor - simplified
+            # Volume factor - adjusted by period
             volume_factor = 1.0
             if crypto.volume_24h_usd and crypto.market_cap_usd and crypto.market_cap_usd > 0:
                 volume_ratio = crypto.volume_24h_usd / crypto.market_cap_usd
-                volume_factor = 1.2 if volume_ratio > 0.1 else 0.8 if volume_ratio < 0.01 else 1.0
+                
+                # Different volume importance by period
+                if period in ['1h', '24h']:
+                    # Short periods care more about volume
+                    volume_factor = 1.3 if volume_ratio > 0.15 else 0.7 if volume_ratio < 0.005 else 1.0
+                elif period in ['7d', '30d']:
+                    # Medium periods moderate volume factor
+                    volume_factor = 1.2 if volume_ratio > 0.1 else 0.8 if volume_ratio < 0.01 else 1.0
+                else:
+                    # Long periods less sensitive to daily volume
+                    volume_factor = 1.1 if volume_ratio > 0.05 else 0.9 if volume_ratio < 0.02 else 1.0
             
-            # Quick score calculation
-            base_score = max(5, min(100, 50 + momentum_trend * 5))
+            # Calculate base score with period-specific scaling
+            period_momentum_weights = {
+                '1h': 10.0,    # High sensitivity for short term
+                '24h': 8.0,    # Standard sensitivity
+                '7d': 6.0,     # Medium sensitivity
+                '30d': 4.0,    # Lower sensitivity
+                '90d': 3.0,    # Even lower for long term
+                '180d': 2.5,
+                '270d': 2.0,
+                '365d': 1.5    # Lowest sensitivity for annual
+            }
             
-            return base_score * volume_factor
+            weight = period_momentum_weights.get(period, 5.0)
+            base_score = max(5, min(100, 50 + momentum_trend * weight))
             
-        except Exception:
+            final_score = base_score * volume_factor
+            
+            return max(5, min(100, final_score))
+            
+        except Exception as e:
+            logger.warning(f"Error calculating momentum score for {crypto.symbol} period {period}: {e}")
             return 50.0
     
     def _calculate_performance_score(self, crypto: CryptoCurrency, period: str) -> float:
