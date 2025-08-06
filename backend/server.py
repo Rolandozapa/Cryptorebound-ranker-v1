@@ -448,8 +448,12 @@ async def get_crypto_ranking(
             cryptos = await data_service.get_aggregated_crypto_data(force_refresh=True)
             
             if cryptos:
+                # Apply dynamic limit based on request size and system capacity
+                effective_limit = min(len(cryptos), limit + offset + 100)  # Buffer for better ranking
+                limited_cryptos = cryptos[:effective_limit]
+                
                 # Basic scoring and pagination
-                scored_cryptos = scoring_service.calculate_scores(cryptos[:500], period)  # Limit to 500 for performance
+                scored_cryptos = scoring_service.calculate_scores(limited_cryptos, period)
                 end_index = offset + limit
                 result = scored_cryptos[offset:end_index]
         
