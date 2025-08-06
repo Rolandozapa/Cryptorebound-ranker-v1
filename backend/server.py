@@ -212,19 +212,19 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
 @api_router.get("/cryptos/multi-period-analysis", response_model=List[MultiPeriodCrypto])
 async def get_multi_period_analysis(
     limit: int = Query(15, description="Number of top cryptos to return", ge=5, le=50),
-    periods: List[str] = Query(['24h', '7d', '30d'], description="Periods to analyze")
+    short_periods: List[str] = Query(['24h', '7d', '30d'], description="Short-term periods to analyze"),
+    long_periods: List[str] = Query(['90d', '180d', '270d', '365d'], description="Long-term periods to analyze")
 ):
-    """Get top cryptocurrencies analyzed across multiple periods"""
+    """Get top cryptocurrencies analyzed across multiple periods with short/long term breakdown"""
     try:
-        logger.info(f"Starting multi-period analysis for {len(periods)} periods, top {limit}")
+        logger.info(f"Starting multi-period analysis: {len(short_periods)} short + {len(long_periods)} long periods, top {limit}")
         
         # Dictionary to store all crypto data with scores from different periods
         crypto_scores = {}
         
-        # Get data for each period
-        for period in periods:
+        # Get data for SHORT TERM periods first
+        for period in short_periods:
             try:
-                # Get ranking data for this period (larger sample for better analysis)
                 period_cryptos = await data_service.get_optimized_crypto_ranking(
                     period=period, 
                     limit=200,  # Get more data for analysis
@@ -232,9 +232,8 @@ async def get_multi_period_analysis(
                     force_refresh=False
                 )
                 
-                logger.info(f"Got {len(period_cryptos)} cryptos for period {period}")
+                logger.info(f"Got {len(period_cryptos)} cryptos for SHORT period {period}")
                 
-                # Process each crypto for this period
                 for crypto in period_cryptos:
                     symbol = crypto.symbol
                     
@@ -244,59 +243,151 @@ async def get_multi_period_analysis(
                             'name': crypto.name,
                             'price_usd': crypto.price_usd,
                             'market_cap_usd': crypto.market_cap_usd,
-                            'period_scores': {},
-                            'total_score': 0,
-                            'period_count': 0
+                            'short_period_scores': {},
+                            'long_period_scores': {},
+                            'short_total_score': 0,
+                            'long_total_score': 0,
+                            'short_period_count': 0,
+                            'long_period_count': 0
                         }
                     
-                    # Add score for this period
+                    # Add score for this SHORT period
                     score = getattr(crypto, 'total_score', 0) or 0
-                    crypto_scores[symbol]['period_scores'][period] = score
-                    crypto_scores[symbol]['total_score'] += score
-                    crypto_scores[symbol]['period_count'] += 1
+                    crypto_scores[symbol]['short_period_scores'][period] = score
+                    crypto_scores[symbol]['short_total_score'] += score
+                    crypto_scores[symbol]['short_period_count'] += 1
                     
             except Exception as e:
-                logger.warning(f"Error processing period {period}: {e}")
+                logger.warning(f"Error processing short period {period}: {e}")
                 continue
         
-        # Filter cryptos that appear in multiple periods for better consistency
-        min_periods = max(1, len(periods) // 2)  # At least half the periods
+        # Get data for LONG TERM periods 
+        for period in long_periods:
+            try:
+                period_cryptos = await data_service.get_optimized_crypto_ranking(
+                    period=period, 
+                    limit=200,  # Get more data for analysis
+                    offset=0, 
+                    force_refresh=False
+                )
+                
+                logger.info(f"Got {len(period_cryptos)} cryptos for LONG period {period}")
+                
+                for crypto in period_cryptos:
+                    symbol = crypto.symbol
+                    
+                    # Initialize if not exists
+                    if symbol not in crypto_scores:
+                        crypto_scores[symbol] = {
+                            'symbol': symbol,
+                            'name': crypto.name,
+                            'price_usd': crypto.price_usd,
+                            'market_cap_usd': crypto.market_cap_usd,
+                            'short_period_scores': {},
+                            'long_period_scores': {},
+                            'short_total_score': 0,
+                            'long_total_score': 0,
+                            'short_period_count': 0,
+                            'long_period_count': 0
+                        }
+                    
+                    # Add score for this LONG period
+                    score = getattr(crypto, 'total_score', 0) or 0
+                    crypto_scores[symbol]['long_period_scores'][period] = score
+                    crypto_scores[symbol]['long_total_score'] += score
+                    crypto_scores[symbol]['long_period_count'] += 1
+                    
+            except Exception as e:
+                logger.warning(f"Error processing long period {period}: {e}")
+                continue
+        
+        # Filter cryptos that appear in both short and long periods
+        min_short_periods = max(1, len(short_periods) // 2)  # At least half the short periods
+        min_long_periods = max(1, len(long_periods) // 3)    # At least 1/3 of long periods
+        
         filtered_cryptos = {}
         
         for symbol, data in crypto_scores.items():
-            if data['period_count'] >= min_periods:
-                # Calculate average score
-                data['average_score'] = data['total_score'] / data['period_count']
+            if data['short_period_count'] >= min_short_periods:
+                # Calculate SHORT TERM average score
+                data['short_average_score'] = data['short_total_score'] / data['short_period_count']
                 
-                # Calculate consistency (lower std dev = more consistent)
-                scores = list(data['period_scores'].values())
-                if len(scores) > 1:
-                    mean_score = sum(scores) / len(scores)
-                    variance = sum((x - mean_score) ** 2 for x in scores) / len(scores)
-                    std_dev = variance ** 0.5
-                    # Consistency score (0-100, higher is better)
-                    max_possible_std = mean_score  # Maximum possible std dev
-                    data['consistency_score'] = max(0, 100 - (std_dev / max(max_possible_std, 1)) * 100)
+                # Calculate LONG TERM average score if we have data
+                if data['long_period_count'] >= min_long_periods:
+                    data['long_average_score'] = data['long_total_score'] / data['long_period_count']
                 else:
-                    data['consistency_score'] = 100  # Perfect consistency with one score
+                    data['long_average_score'] = None
                 
-                # Find best and worst periods
-                if data['period_scores']:
-                    sorted_periods = sorted(data['period_scores'].items(), key=lambda x: x[1], reverse=True)
+                # Calculate SHORT TERM consistency
+                short_scores = list(data['short_period_scores'].values())
+                if len(short_scores) > 1:
+                    mean_score = sum(short_scores) / len(short_scores)
+                    variance = sum((x - mean_score) ** 2 for x in short_scores) / len(short_scores)
+                    std_dev = variance ** 0.5
+                    data['short_consistency_score'] = max(0, 100 - (std_dev / max(mean_score, 1)) * 100)
+                else:
+                    data['short_consistency_score'] = 100
+                
+                # Calculate LONG TERM consistency
+                if data['long_average_score'] is not None:
+                    long_scores = list(data['long_period_scores'].values())
+                    if len(long_scores) > 1:
+                        mean_score = sum(long_scores) / len(long_scores)
+                        variance = sum((x - mean_score) ** 2 for x in long_scores) / len(long_scores)
+                        std_dev = variance ** 0.5
+                        data['long_consistency_score'] = max(0, 100 - (std_dev / max(mean_score, 1)) * 100)
+                    else:
+                        data['long_consistency_score'] = 100
+                else:
+                    data['long_consistency_score'] = None
+                
+                # Calculate TREND CONFIRMATION
+                if data['long_average_score'] is not None:
+                    short_avg = data['short_average_score']
+                    long_avg = data['long_average_score']
+                    
+                    # Compare short vs long term performance
+                    if abs(short_avg - long_avg) <= 10:
+                        data['trend_confirmation'] = "Strong"  # Very similar scores
+                    elif short_avg > long_avg and (short_avg - long_avg) <= 20:
+                        data['trend_confirmation'] = "Accelerating"  # Short term improving
+                    elif long_avg > short_avg and (long_avg - short_avg) <= 20:
+                        data['trend_confirmation'] = "Cooling"  # Long term was better
+                    elif abs(short_avg - long_avg) > 30:
+                        data['trend_confirmation'] = "Divergent"  # Very different
+                    else:
+                        data['trend_confirmation'] = "Weak"  # Moderate difference
+                else:
+                    data['trend_confirmation'] = "Unknown"  # No long term data
+                
+                # Find best and worst periods (combine all periods)
+                all_periods = {**data['short_period_scores'], **data['long_period_scores']}
+                if all_periods:
+                    sorted_periods = sorted(all_periods.items(), key=lambda x: x[1], reverse=True)
                     data['best_period'] = sorted_periods[0][0]
                     data['worst_period'] = sorted_periods[-1][0]
                 else:
-                    data['best_period'] = periods[0] if periods else 'unknown'
-                    data['worst_period'] = periods[0] if periods else 'unknown'
+                    data['best_period'] = short_periods[0] if short_periods else 'unknown'
+                    data['worst_period'] = short_periods[0] if short_periods else 'unknown'
                 
                 filtered_cryptos[symbol] = data
         
-        # Sort by average score (with consistency bonus)
+        # Sort by SHORT TERM average score (with consistency bonus) - prioritize recent performance
         sorted_cryptos = []
         for symbol, data in filtered_cryptos.items():
-            # Give slight bonus for consistency (up to 5 points)
-            consistency_bonus = (data['consistency_score'] / 100) * 5
-            final_score = data['average_score'] + consistency_bonus
+            # Give slight bonus for SHORT TERM consistency (up to 5 points)
+            consistency_bonus = (data['short_consistency_score'] / 100) * 5
+            
+            # Give bonus for STRONG trend confirmation (up to 3 points)
+            trend_bonus = 0
+            if data['trend_confirmation'] == "Strong":
+                trend_bonus = 3
+            elif data['trend_confirmation'] == "Accelerating":
+                trend_bonus = 2
+            elif data['trend_confirmation'] == "Cooling":
+                trend_bonus = 1
+            
+            final_score = data['short_average_score'] + consistency_bonus + trend_bonus
             
             sorted_cryptos.append((symbol, data, final_score))
         
@@ -312,15 +403,19 @@ async def get_multi_period_analysis(
                 name=data['name'],
                 price_usd=data['price_usd'],
                 market_cap_usd=data['market_cap_usd'],
-                average_score=round(data['average_score'], 2),
-                period_scores=data['period_scores'],
+                average_score=round(data['short_average_score'], 2),  # Short term average
+                long_term_average=round(data['long_average_score'], 2) if data['long_average_score'] is not None else None,
+                period_scores=data['short_period_scores'],  # Short term scores
+                long_term_scores=data['long_period_scores'] if data['long_period_scores'] else None,
                 best_period=data['best_period'],
                 worst_period=data['worst_period'],
-                consistency_score=round(data['consistency_score'], 1),
+                consistency_score=round(data['short_consistency_score'], 1),
+                long_term_consistency=round(data['long_consistency_score'], 1) if data['long_consistency_score'] is not None else None,
+                trend_confirmation=data['trend_confirmation'],
                 rank=rank
             ))
         
-        logger.info(f"Multi-period analysis completed: {len(result)} cryptos analyzed across {len(periods)} periods")
+        logger.info(f"Multi-period analysis completed: {len(result)} cryptos analyzed across {len(short_periods)} short + {len(long_periods)} long periods")
         
         return result
         
