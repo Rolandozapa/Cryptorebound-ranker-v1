@@ -263,6 +263,69 @@ class DataAggregationService:
             logger.error(f"Error fetching data from CryptoCompare: {e}")
             return []
     
+    async def _get_coinapi_data(self) -> List[Dict[str, Any]]:
+        """Get comprehensive data from CoinAPI (premium service)"""
+        try:
+            logger.info("Fetching comprehensive data from CoinAPI")
+            
+            # CoinAPI has rate limits but provides high-quality data
+            limit = min(500, self.target_crypto_count)  # Conservative limit due to rate limits
+            
+            crypto_data = await self.coinapi_service.get_comprehensive_data(limit)
+            
+            if crypto_data:
+                logger.info(f"Retrieved {len(crypto_data)} cryptocurrencies from CoinAPI")
+                return crypto_data
+            else:
+                logger.warning("No data received from CoinAPI")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching data from CoinAPI: {e}")
+            return []
+    
+    async def _get_coinpaprika_data(self) -> List[Dict[str, Any]]:
+        """Get comprehensive data from CoinPaprika"""
+        try:
+            logger.info("Fetching comprehensive data from CoinPaprika")
+            
+            # CoinPaprika provides good coverage for free
+            limit = min(1000, self.target_crypto_count)  # Up to 1000 cryptos
+            
+            crypto_data = await self.coinpaprika_service.get_comprehensive_data(limit)
+            
+            if crypto_data:
+                logger.info(f"Retrieved {len(crypto_data)} cryptocurrencies from CoinPaprika")
+                return crypto_data
+            else:
+                logger.warning("No data received from CoinPaprika")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching data from CoinPaprika: {e}")
+            return []
+    
+    async def _get_bitfinex_data(self) -> List[Dict[str, Any]]:
+        """Get comprehensive data from Bitfinex"""
+        try:
+            logger.info("Fetching comprehensive data from Bitfinex")
+            
+            # Bitfinex provides exchange data, good for major cryptos
+            limit = min(200, self.target_crypto_count)  # Conservative limit for exchange API
+            
+            crypto_data = await self.bitfinex_service.get_comprehensive_data(limit)
+            
+            if crypto_data:
+                logger.info(f"Retrieved {len(crypto_data)} cryptocurrencies from Bitfinex")
+                return crypto_data
+            else:
+                logger.warning("No data received from Bitfinex")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching data from Bitfinex: {e}")
+            return []
+    
     def _get_source_distribution(self, crypto_list: List[Dict]) -> Dict[str, int]:
         """Get distribution of cryptocurrencies by primary source"""
         distribution = {}
