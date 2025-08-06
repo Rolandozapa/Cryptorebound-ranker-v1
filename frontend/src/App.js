@@ -211,15 +211,21 @@ const CryptoRebound = () => {
         params: {
           limit: 15,
           short_periods: ['24h', '7d', '30d'],
-          long_periods: ['90d', '180d', '270d', '365d']
-        }
+          long_periods: ['90d', '180d', '270d', '365d'],
+          fix_historical: false  // Désactivé par défaut pour la performance
+        },
+        timeout: 60000  // 60 secondes de timeout
       });
       
       setMultiPeriodResults(response.data);
       setShowMultiPeriodAnalysis(true);
     } catch (err) {
       console.error('Error fetching multi-period analysis:', err);
-      setError('Erreur lors de l\'analyse multi-périodes');
+      if (err.code === 'ECONNABORTED') {
+        setError('L\'analyse multi-périodes a pris trop de temps. Veuillez réessayer.');
+      } else {
+        setError('Erreur lors de l\'analyse multi-périodes');
+      }
     } finally {
       setMultiPeriodLoading(false);
     }
