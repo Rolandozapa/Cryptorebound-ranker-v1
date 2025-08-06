@@ -65,6 +65,21 @@ class DynamicLimitResponse(BaseModel):
     memory_usage_estimate: str
     system_resources: SystemResourcesInfo
 
+# Models for background refresh system
+class BackgroundRefreshResponse(BaseModel):
+    status: str
+    task_id: Optional[str] = None
+    message: str
+    estimated_duration_seconds: Optional[int] = None
+
+class RefreshStatusResponse(BaseModel):
+    status: str  # 'idle', 'running', 'completed', 'failed'
+    active_tasks: int
+    last_update: Optional[str] = None
+    last_duration_seconds: Optional[float] = None
+    last_error: Optional[str] = None
+    next_auto_refresh: Optional[str] = None
+
 # Legacy endpoints for backwards compatibility
 @api_router.get("/")
 async def root():
