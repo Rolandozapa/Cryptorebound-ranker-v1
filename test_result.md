@@ -195,9 +195,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Remove 1000 crypto hard limit from API validation"
-    - "Add dynamic memory/token-aware analysis limit endpoint"
     - "Add max analyzing catch box UI component"
+    - "Update display limit options for higher crypto counts"
+    - "Integrate dynamic limit fetching from backend"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
