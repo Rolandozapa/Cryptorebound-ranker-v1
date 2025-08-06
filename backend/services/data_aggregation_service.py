@@ -1238,5 +1238,8 @@ class DataAggregationService:
         """Clean up resources"""
         try:
             await self.fallback_service.close()
+            await self.coinapi_service.close()
+            await self.coinpaprika_service.close()
+            await self.bitfinex_service.close()
         except Exception as e:
             logger.error(f"Error cleaning up resources: {e}")
