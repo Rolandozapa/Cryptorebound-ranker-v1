@@ -150,6 +150,18 @@ backend:
         agent: "testing"
         comment: "TESTED: Data aggregation handles large datasets efficiently. System processes 2000+ crypto requests in 1.49 seconds (excellent performance). Dynamic fetch limits working correctly. Pagination and force_refresh functionality working properly. Minor: Some database comparison warnings in logs but not affecting functionality."
 
+  - task: "Crypto data refresh performance optimization"
+    implemented: true
+    working: false
+    file: "backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "PERFORMANCE ISSUE IDENTIFIED: Refresh endpoints (/api/cryptos/refresh) timeout after 30-60s due to slow external API calls. System makes sequential calls to CoinGecko and Coinlore APIs which take 10+ seconds each. Ranking endpoints work excellently (1.6s for 500 cryptos). Health check shows Binance API down. ROOT CAUSE: Synchronous external API calls in refresh process. NEEDS: Async/background refresh implementation to avoid frontend timeouts."
+
 frontend:
   - task: "Add max analyzing catch box UI component"
     implemented: true
