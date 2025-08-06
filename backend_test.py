@@ -185,15 +185,17 @@ class BackendTester:
             self.log_test("Optimized Caching System", False, f"Exception: {str(e)}")
             return False
 
-    def test_data_aggregation_with_7_apis(self):
-        """Test enhanced data aggregation with 7 API sources"""
+    def test_data_aggregation_with_8_apis(self):
+        """Test enhanced data aggregation with 8 API sources including CoinMarketCap priority system"""
         try:
-            print("Testing enhanced data aggregation with 7 API sources...")
+            print("Testing enhanced data aggregation with 8 API sources...")
+            print("  Priority system: CoinMarketCap=1, CryptoCompare=2, CoinAPI=3, etc.")
             
-            # Test different request sizes to verify load balancing strategies
-            test_sizes = [50, 200, 800, 1500]  # small, medium, large, xlarge
+            # Test different request sizes to verify enhanced load balancing strategies
+            test_sizes = [100, 500, 1000, 2000]  # Updated sizes for performance benchmarks
             
             successful_tests = 0
+            performance_results = {}
             
             for size in test_sizes:
                 print(f"  Testing aggregation with {size} cryptos...")
@@ -221,19 +223,27 @@ class BackendTester:
                         
                         data_quality = (valid_cryptos / len(data)) * 100
                         
-                        # Performance assessment
+                        # Enhanced performance assessment for optimized system
                         if request_time < 10:
                             performance = "Excellent"
-                        elif request_time < 20:
+                        elif request_time < 15:
                             performance = "Good"
-                        elif request_time < 40:
+                        elif request_time < 25:
                             performance = "Acceptable"
                         else:
                             performance = "Slow"
                         
+                        performance_results[size] = {
+                            'time': request_time,
+                            'quality': data_quality,
+                            'count': len(data),
+                            'performance': performance
+                        }
+                        
                         details = f"Size: {size}, Returned: {len(data)}, Quality: {data_quality:.1f}%, Time: {request_time:.2f}s ({performance})"
                         
-                        if data_quality >= 80 and request_time < 45:
+                        # Higher standards for optimized system
+                        if data_quality >= 85 and request_time < 30:
                             self.log_test(f"Data Aggregation - {size} cryptos", True, details)
                             successful_tests += 1
                         else:
@@ -243,16 +253,20 @@ class BackendTester:
                 else:
                     self.log_test(f"Data Aggregation - {size} cryptos", False, f"HTTP {response.status_code}")
             
-            # Overall assessment
+            # Overall assessment with performance comparison
             if successful_tests >= len(test_sizes) // 2:
-                self.log_test("Enhanced Data Aggregation (7 APIs)", True, f"Successful for {successful_tests}/{len(test_sizes)} request sizes")
-                return True
+                # Check if system meets "Excellent" performance target (<10s)
+                excellent_performance_count = sum(1 for result in performance_results.values() if result['time'] < 10)
+                
+                details = f"Successful for {successful_tests}/{len(test_sizes)} request sizes. {excellent_performance_count} achieved <10s target."
+                self.log_test("Enhanced Data Aggregation (8 APIs)", True, details)
+                return performance_results
             else:
-                self.log_test("Enhanced Data Aggregation (7 APIs)", False, f"Failed for most sizes - only {successful_tests}/{len(test_sizes)} successful")
+                self.log_test("Enhanced Data Aggregation (8 APIs)", False, f"Failed for most sizes - only {successful_tests}/{len(test_sizes)} successful")
                 return False
                 
         except Exception as e:
-            self.log_test("Enhanced Data Aggregation (7 APIs)", False, f"Exception: {str(e)}")
+            self.log_test("Enhanced Data Aggregation (8 APIs)", False, f"Exception: {str(e)}")
             return False
 
     def test_api_service_integrations(self):
