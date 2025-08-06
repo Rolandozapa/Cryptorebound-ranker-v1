@@ -340,7 +340,7 @@ class DatabaseCacheService:
     async def _create_enrichment_task_if_needed(self, crypto_data: CryptoDataDB):
         """Crée une tâche d'enrichissement si nécessaire"""
         try:
-            if not self.db:
+            if self.db is None:
                 return
             
             # Suggérer les champs à enrichir
