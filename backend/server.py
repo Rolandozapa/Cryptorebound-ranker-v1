@@ -51,6 +51,20 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+# Models for dynamic limit system
+class SystemResourcesInfo(BaseModel):
+    available_memory_mb: float
+    cpu_usage_percent: float
+    recommended_max_cryptos: int
+    performance_mode: str  # 'optimal', 'balanced', 'maximum'
+    current_load: str  # 'low', 'medium', 'high'
+
+class DynamicLimitResponse(BaseModel):
+    max_recommended_limit: int
+    performance_impact: str
+    memory_usage_estimate: str
+    system_resources: SystemResourcesInfo
+
 # Legacy endpoints for backwards compatibility
 @api_router.get("/")
 async def root():
