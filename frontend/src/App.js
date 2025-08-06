@@ -125,18 +125,34 @@ const CryptoRebound = () => {
     };
   }, [refreshStatus, checkRefreshStatus]);
 
-  // Manual refresh
+  // Manual refresh - now uses async background refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await axios.post(`${API}/cryptos/refresh`, {
-        force: true,
-        period: selectedPeriod
+      // Start background refresh
+      const response = await axios.post(`${API}/cryptos/refresh-async`, null, {
+        params: {
+          force: true,
+          periods: [selectedPeriod]
+        }
       });
-      await fetchCryptoRanking(true);
+      
+      if (response.data.status === 'started') {
+        setRefreshStatus('running');
+        setRefreshProgress('Actualisation démarrée...');
+        // Start checking status
+        checkRefreshStatus();
+      } else if (response.data.status === 'already_running') {
+        setRefreshProgress('Actualisation déjà en cours...');
+        setRefreshStatus('running');
+        checkRefreshStatus();
+      } else {
+        throw new Error('Failed to start refresh');
+      }
     } catch (err) {
-      console.error('Error refreshing data:', err);
-      setError('Erreur lors du rafraîchissement');
+      console.error('Error starting refresh:', err);
+      setError('Erreur lors du démarrage de l\'actualisation');
+      setRefreshProgress('');
     } finally {
       setRefreshing(false);
     }
