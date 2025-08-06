@@ -366,7 +366,7 @@ const CryptoRebound = () => {
             </div>
             <div className="p-6">
               <p className="text-gray-600 mb-4">
-                Analyse des meilleures cryptomonnaies sur les périodes 24h, 7j et 30j combinées
+                📈 <strong>Court terme:</strong> 24h, 7j, 30j | 📊 <strong>Long terme:</strong> 3mois, 6mois, 9mois, 1an
               </p>
               
               <div className="overflow-x-auto">
@@ -376,10 +376,11 @@ const CryptoRebound = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Crypto</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score Moyen</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score Court Terme</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score Long Terme</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Confirmation</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Consistance</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meilleure Période</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scores Détaillés</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Détails</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -405,27 +406,68 @@ const CryptoRebound = () => {
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span className={`text-sm font-medium ${
-                              crypto.consistency_score >= 80 ? 'text-green-600' :
-                              crypto.consistency_score >= 60 ? 'text-yellow-600' : 'text-red-600'
-                            }`}>
-                              {crypto.consistency_score}%
+                          {crypto.long_term_average ? (
+                            <span className={`text-sm font-bold ${getScoreColor(crypto.long_term_average)}`}>
+                              {crypto.long_term_average}
                             </span>
-                          </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">Pas de données</span>
+                          )}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            {crypto.best_period}
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            crypto.trend_confirmation === 'Strong' ? 'bg-green-100 text-green-800' :
+                            crypto.trend_confirmation === 'Accelerating' ? 'bg-blue-100 text-blue-800' :
+                            crypto.trend_confirmation === 'Cooling' ? 'bg-yellow-100 text-yellow-800' :
+                            crypto.trend_confirmation === 'Divergent' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {crypto.trend_confirmation === 'Strong' ? '🔥 Fort' :
+                             crypto.trend_confirmation === 'Accelerating' ? '🚀 Accélère' :
+                             crypto.trend_confirmation === 'Cooling' ? '❄️ Ralentit' :
+                             crypto.trend_confirmation === 'Divergent' ? '⚠️ Divergent' :
+                             '❓ Inconnu'}
                           </span>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-xs">
-                          {Object.entries(crypto.period_scores).map(([period, score]) => (
-                            <div key={period} className="flex justify-between">
-                              <span>{period}:</span>
-                              <span className="font-medium">{score.toFixed(1)}</span>
-                            </div>
-                          ))}
+                          <div>
+                            <span className={`font-medium ${
+                              crypto.consistency_score >= 80 ? 'text-green-600' :
+                              crypto.consistency_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              CT: {crypto.consistency_score}%
+                            </span>
+                            {crypto.long_term_consistency && (
+                              <div className={`font-medium ${
+                                crypto.long_term_consistency >= 80 ? 'text-green-600' :
+                                crypto.long_term_consistency >= 60 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                LT: {crypto.long_term_consistency}%
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs">
+                          <div className="space-y-1">
+                            <div className="text-blue-600 font-medium">Court terme:</div>
+                            {Object.entries(crypto.period_scores).map(([period, score]) => (
+                              <div key={period} className="flex justify-between">
+                                <span>{period}:</span>
+                                <span className="font-medium">{score.toFixed(1)}</span>
+                              </div>
+                            ))}
+                            {crypto.long_term_scores && Object.keys(crypto.long_term_scores).length > 0 && (
+                              <>
+                                <div className="text-purple-600 font-medium mt-2">Long terme:</div>
+                                {Object.entries(crypto.long_term_scores).map(([period, score]) => (
+                                  <div key={period} className="flex justify-between">
+                                    <span>{period}:</span>
+                                    <span className="font-medium">{score.toFixed(1)}</span>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -434,9 +476,19 @@ const CryptoRebound = () => {
               </div>
               
               <div className="mt-4 text-sm text-gray-600">
-                <p><strong>Score Moyen:</strong> Moyenne des scores sur toutes les périodes analysées</p>
-                <p><strong>Consistance:</strong> Régularité des performances (100% = très stable)</p>
-                <p><strong>Meilleure Période:</strong> Période où la crypto performe le mieux</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p><strong>Score Court Terme:</strong> Moyenne 24h, 7j, 30j</p>
+                    <p><strong>Score Long Terme:</strong> Moyenne 3mois, 6mois, 9mois, 1an</p>
+                    <p><strong>Consistance CT/LT:</strong> Régularité des performances</p>
+                  </div>
+                  <div>
+                    <p><strong>🔥 Fort:</strong> Cohérence court/long terme</p>
+                    <p><strong>🚀 Accélère:</strong> Court terme > long terme</p>
+                    <p><strong>❄️ Ralentit:</strong> Long terme > court terme</p>
+                    <p><strong>⚠️ Divergent:</strong> Grande différence de tendances</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
