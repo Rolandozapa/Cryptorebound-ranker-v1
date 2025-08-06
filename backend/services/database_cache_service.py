@@ -371,7 +371,7 @@ class DatabaseCacheService:
     async def get_database_stats(self) -> Dict[str, Any]:
         """Récupère les statistiques de la base de données"""
         try:
-            if not self.db:
+            if self.db is None:
                 return {}
             
             stats = {}
