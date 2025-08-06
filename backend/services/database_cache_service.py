@@ -215,7 +215,7 @@ class DatabaseCacheService:
     async def update_source_metrics(self, source: DataSource, symbol: str, success: bool, response_time: float = 0):
         """Met à jour les métriques de qualité d'une source"""
         try:
-            if not self.db:
+            if self.db is None:
                 return
             
             now = datetime.utcnow()
