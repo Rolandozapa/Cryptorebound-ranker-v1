@@ -200,6 +200,50 @@ class DataAggregationService:
             logger.error(f"Error retrieving cached crypto data: {e}")
             return []
     
+    async def _get_cached_crypto_data_limited(self, required_fields: List[str], limit: int = 500) -> List:
+        """Récupère une quantité limitée de cryptos depuis le cache pour optimiser les performances"""
+        try:
+            if self.db_cache.db is None:
+                return []
+            
+            # Récupérer seulement le nombre nécessaire de cryptos avec qualité acceptable
+            cursor = self.db_cache.db.crypto_data.find({
+                "data_quality": {"$ne": "invalid"},
+                "quality_score": {"$gte": 40},  # Score minimum plus bas pour avoir plus de résultats
+                "price_usd": {"$gt": 0}
+            }).sort([
+                ("quality_score", -1),
+                ("market_cap_usd", -1)
+            ]).limit(limit)
+            
+            cryptos = []
+            async for doc in cursor:
+                try:
+                    from db_models import CryptoDataDB
+                    crypto_db = CryptoDataDB(**doc)
+                    
+                    # Vérifier la fraîcheur si des champs spécifiques sont requis
+                    if required_fields:
+                        if not self.db_cache._check_data_freshness(crypto_db, required_fields):
+                            continue
+                    
+                    cryptos.append(crypto_db)
+                    
+                except Exception as e:
+                    logger.warning(f"Error parsing cached crypto data: {e}")
+                    continue
+            
+            logger.info(f"Retrieved {len(cryptos)} limited cached cryptos")
+            return cryptos
+            
+        except Exception as e:
+            logger.error(f"Error retrieving limited cached crypto data: {e}")
+            return []
+    
+    def set_db_client(self, db_client):
+        """Configure le client de base de données"""
+        self.db_cache.set_db_client(db_client)
+    
     async def _get_all_available_symbols(self) -> List[str]:
         """Récupère la liste de tous les symboles disponibles depuis les APIs"""
         try:
