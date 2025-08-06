@@ -80,6 +80,51 @@ const CryptoRebound = () => {
     }
   }, [selectedPeriod, currentPage, displayLimit, maxAnalysisLimit]);
 
+  // New state for refresh status tracking
+  const [refreshStatus, setRefreshStatus] = useState('idle');
+  const [refreshProgress, setRefreshProgress] = useState('');
+
+  // Check refresh status periodically
+  const checkRefreshStatus = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/cryptos/refresh-status`);
+      const status = response.data.status;
+      setRefreshStatus(status);
+      
+      if (status === 'running') {
+        setRefreshProgress('Actualisation en cours...');
+      } else if (status === 'completed') {
+        setRefreshProgress('Actualisation terminée');
+        // Refresh the crypto data after successful background refresh
+        await fetchCryptoRanking(false);
+        // Reset progress after 3 seconds
+        setTimeout(() => {
+          setRefreshProgress('');
+          setRefreshStatus('idle');
+        }, 3000);
+      } else if (status === 'failed') {
+        setRefreshProgress('Erreur lors de l\'actualisation');
+        setTimeout(() => {
+          setRefreshProgress('');
+          setRefreshStatus('idle');
+        }, 5000);
+      }
+    } catch (err) {
+      console.error('Error checking refresh status:', err);
+    }
+  }, [fetchCryptoRanking]);
+
+  // Auto-check refresh status when it's running
+  useEffect(() => {
+    let interval;
+    if (refreshStatus === 'running') {
+      interval = setInterval(checkRefreshStatus, 2000); // Check every 2 seconds
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [refreshStatus, checkRefreshStatus]);
+
   // Manual refresh
   const handleRefresh = async () => {
     setRefreshing(true);
