@@ -45,6 +45,20 @@ class DataAggregationService:
         self.target_crypto_count = 2000  # Increased target
         self.max_analysis_limit = 5000  # Maximum cryptos that can be analyzed at once
         
+        # Smart caching configuration based on periods
+        self.period_freshness_thresholds = {
+            '24h': timedelta(minutes=4.3),    # 0.3% of 24h = ~4.3 minutes
+            '7d': timedelta(minutes=30),      # 0.3% of 7 days = ~30 minutes
+            '30d': timedelta(hours=2.2),      # 0.3% of 30 days = ~2.2 hours
+            '1h': timedelta(seconds=11),      # 0.3% of 1h = ~11 seconds
+            'default': timedelta(minutes=5)   # Default threshold
+        }
+        
+        # Memory cache for recent data
+        self.memory_cache = {}
+        self.memory_cache_timestamps = {}
+        self.max_memory_cache_age = timedelta(hours=1)  # Keep in memory for 1 hour max
+        
         # Background refresh management
         self.background_refresh_tasks = {}  # Track active background tasks
         self.refresh_status = "idle"  # idle, running, completed, failed
