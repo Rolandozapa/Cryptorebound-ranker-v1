@@ -65,15 +65,98 @@ async def get_status_checks():
 
 # New CryptoRebound endpoints
 
-@api_router.get("/health")
-async def health_check():
-    """Check the health of all data services"""
-    health_status = data_service.is_healthy()
-    return {
-        "status": "healthy",
-        "services": health_status,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+@api_router.get("/database/stats")
+async def get_database_stats():
+    """Get detailed database statistics"""
+    try:
+        stats = await data_service.get_database_stats()
+        return {
+            "status": "success",
+            "database_stats": stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting database stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/database/enrich")
+async def trigger_enrichment(symbols: List[str] = Query([], description="Specific symbols to enrich")):
+    """Trigger data enrichment for specific symbols"""
+    try:
+        if not symbols:
+            # Get symbols that need enrichment
+            symbols = await data_service.db_cache.get_stale_data_symbols(limit=20)
+        
+        if symbols:
+            await data_service.enrichment_service.schedule_enrichment_for_symbols(symbols, priority=1)
+            await data_service.enrichment_service.process_enrichment_tasks(max_tasks=5)
+            
+            return {
+                "status": "success",
+                "message": f"Triggered enrichment for {len(symbols)} symbols",
+                "symbols": symbols,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "status": "info",
+                "message": "No symbols need enrichment",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        
+    except Exception as e:
+        logger.error(f"Error triggering enrichment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/database/quality")
+async def get_data_quality_overview():
+    """Get overview of data quality in the database"""
+    try:
+        stats = await data_service.get_database_stats()
+        
+        return {
+            "status": "success",
+            "quality_overview": {
+                "total_cryptocurrencies": stats.get("total_cryptocurrencies", 0),
+                "quality_distribution": stats.get("quality_distribution", {}),
+                "average_quality_score": stats.get("average_quality_score", 0),
+                "enrichment_tasks": stats.get("enrichment_tasks", {}),
+            },
+            "recommendations": await _get_quality_recommendations(stats),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting data quality overview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def _get_quality_recommendations(stats: Dict[str, Any]) -> List[str]:
+    """Generate recommendations based on database stats"""
+    recommendations = []
+    
+    quality_dist = stats.get("quality_distribution", {})
+    total_cryptos = stats.get("total_cryptocurrencies", 0)
+    avg_quality = stats.get("average_quality_score", 0)
+    
+    if total_cryptos < 1000:
+        recommendations.append("Consider adding more cryptocurrency data sources to reach the 1000+ target")
+    
+    if avg_quality < 70:
+        recommendations.append("Overall data quality is below optimal. Consider running enrichment tasks")
+    
+    low_quality_percent = (quality_dist.get("low", 0) / max(1, total_cryptos)) * 100
+    if low_quality_percent > 30:
+        recommendations.append(f"{low_quality_percent:.1f}% of data has low quality. Run targeted enrichment")
+    
+    pending_tasks = stats.get("enrichment_tasks", {}).get("pending", 0)
+    if pending_tasks > 50:
+        recommendations.append(f"{pending_tasks} enrichment tasks pending. Consider processing them")
+    
+    if not recommendations:
+        recommendations.append("Data quality looks good! System is operating optimally")
+    
+    return recommendations
 
 @api_router.post("/cryptos/refresh")
 async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
