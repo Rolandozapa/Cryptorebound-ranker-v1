@@ -76,9 +76,9 @@ class YahooFinanceService:
                 crypto_info = {
                     'symbol': base_symbol,
                     'name': info.get('longName', base_symbol),
-                    'price': float(current_price),
-                    'market_cap': info.get('marketCap'),
-                    'volume_24h': float(hist['Volume'].iloc[-1]) if len(hist) > 0 else None,
+                    'price_usd': float(current_price),  # Correction: utiliser price_usd
+                    'market_cap_usd': info.get('marketCap'),  # Correction: utiliser market_cap_usd
+                    'volume_24h_usd': float(hist['Volume'].iloc[-1]) if len(hist) > 0 else None,  # Correction: utiliser volume_24h_usd
                     'percent_change_24h': float(pct_1d),
                     'percent_change_7d': float(pct_7d),
                     'percent_change_30d': float(pct_30d),
