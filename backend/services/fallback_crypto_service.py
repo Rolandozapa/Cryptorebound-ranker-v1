@@ -134,9 +134,9 @@ class FallbackCryptoService:
                                 crypto_data = {
                                     'symbol': item.get('symbol', '').upper(),
                                     'name': item.get('name', ''),
-                                    'price': float(item.get('price_usd', 0)),
-                                    'market_cap': float(item.get('market_cap_usd', 0)) if item.get('market_cap_usd') else None,
-                                    'volume_24h': float(item.get('volume24', 0)) if item.get('volume24') else None,
+                                    'price_usd': float(item.get('price_usd', 0)),  # Correction: déjà correct
+                                    'market_cap_usd': float(item.get('market_cap_usd', 0)) if item.get('market_cap_usd') else None,  # Correction: utiliser market_cap_usd
+                                    'volume_24h_usd': float(item.get('volume24', 0)) if item.get('volume24') else None,  # Correction: utiliser volume_24h_usd
                                     'percent_change_1h': float(item.get('percent_change_1h', 0)) if item.get('percent_change_1h') else None,
                                     'percent_change_24h': float(item.get('percent_change_24h', 0)) if item.get('percent_change_24h') else None,
                                     'percent_change_7d': float(item.get('percent_change_7d', 0)) if item.get('percent_change_7d') else None,
