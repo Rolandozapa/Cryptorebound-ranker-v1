@@ -171,7 +171,7 @@ class DatabaseCacheService:
     async def get_missing_cryptos(self, all_symbols: List[str]) -> List[str]:
         """Trouve les cryptos manquants dans la DB"""
         try:
-            if not self.db:
+            if self.db is None:
                 return all_symbols
             
             # Récupérer tous les symboles en DB
