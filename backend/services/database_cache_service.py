@@ -143,7 +143,7 @@ class DatabaseCacheService:
     async def get_stale_data_symbols(self, limit: int = 100) -> List[str]:
         """Récupère les symboles avec des données obsolètes"""
         try:
-            if not self.db:
+            if self.db is None:
                 return []
             
             now = datetime.utcnow()
