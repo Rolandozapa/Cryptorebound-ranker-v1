@@ -29,8 +29,8 @@ app = FastAPI(title="CryptoRebound Ranking API", version="2.0.0")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Initialize services
-data_service = DataAggregationService()
+# Initialize services with database connection
+data_service = DataAggregationService(db_client=client)
 scoring_service = ScoringService()
 
 # Cache for rankings
