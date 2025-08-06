@@ -85,9 +85,9 @@ class FallbackCryptoService:
                             crypto_data = {
                                 'symbol': item.get('symbol', '').upper(),
                                 'name': item.get('name', ''),
-                                'price': float(item.get('current_price', 0)),
-                                'market_cap': item.get('market_cap'),
-                                'volume_24h': item.get('total_volume'),
+                                'price_usd': float(item.get('current_price', 0)),  # Correction: utiliser price_usd
+                                'market_cap_usd': item.get('market_cap'),  # Correction: utiliser market_cap_usd
+                                'volume_24h_usd': item.get('total_volume'),  # Correction: utiliser volume_24h_usd
                                 'percent_change_1h': item.get('price_change_percentage_1h_in_currency'),
                                 'percent_change_24h': item.get('price_change_percentage_24h_in_currency'),
                                 'percent_change_7d': item.get('price_change_percentage_7d_in_currency'),
