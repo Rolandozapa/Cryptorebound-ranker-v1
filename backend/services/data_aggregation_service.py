@@ -335,60 +335,264 @@ class DataAggregationService:
             logger.error(f"Error computing ranking on demand: {e}")
             return []
         
-    async def get_aggregated_crypto_data(self, force_refresh: bool = False, required_fields: List[str] = None) -> List[CryptoCurrency]:
+    async def get_aggregated_crypto_data(self, force_refresh: bool = False, required_fields: List[str] = None, request_size: int = None) -> List[CryptoCurrency]:
         """
         Récupère les données crypto de manière intelligente : DB first, puis API si nécessaire
+        Enhanced with intelligent load balancing based on request size
         """
         try:
-            logger.info("Starting intelligent data aggregation (DB-first approach)")
+            logger.info(f"Starting intelligent data aggregation (DB-first approach) for {request_size or 'unknown'} cryptos")
             
             # 1. Récupérer les données depuis la DB d'abord
             cached_cryptos = await self._get_cached_crypto_data(required_fields or [])
             logger.info(f"Retrieved {len(cached_cryptos)} cryptocurrencies from cache")
             
-            # 2. Identifier les données manquantes ou obsolètes
+            # 2. Determine load balancing strategy based on request size
+            if request_size:
+                strategy = self._get_load_balancing_strategy(request_size)
+                logger.info(f"Using {strategy} strategy for {request_size} cryptos")
+            else:
+                strategy = 'medium'  # Default strategy
+            
+            # 3. Identifier les données manquantes ou obsolètes
             if force_refresh or len(cached_cryptos) < self.target_crypto_count:
                 logger.info("Fetching fresh data from APIs to complement cache")
                 
-                # Récupérer la liste complète depuis les APIs
-                api_symbols = await self._get_all_available_symbols()
-                logger.info(f"Found {len(api_symbols)} total symbols from APIs")
+                # Use strategy-specific data fetching
+                fresh_data = await self._fetch_data_by_strategy(strategy, request_size)
                 
-                # Identifier les cryptos manquants
-                cached_symbols = {crypto.symbol for crypto in cached_cryptos}
-                missing_symbols = [s for s in api_symbols if s not in cached_symbols]
-                
-                logger.info(f"Found {len(missing_symbols)} missing cryptocurrencies")
-                
-                # Récupérer les données manquantes (increase batch size)
-                if missing_symbols:
-                    batch_size = min(200, len(missing_symbols))  # Increased from 100
-                    await self._fetch_missing_crypto_data(missing_symbols[:batch_size])
-                
-                # Identifier les données obsolètes (increase limit)
-                stale_symbols = await self.db_cache.get_stale_data_symbols(limit=100)  # Increased from 50
-                if stale_symbols:
-                    logger.info(f"Refreshing {len(stale_symbols)} stale cryptocurrencies")
-                    await self._refresh_stale_data(stale_symbols)
+                if fresh_data:
+                    # Store new data in database
+                    stored_count = 0
+                    for crypto_data in fresh_data:
+                        try:
+                            await self.db_cache.store_crypto_data(crypto_data, validate=True)
+                            stored_count += 1
+                        except Exception as e:
+                            logger.warning(f"Failed to store crypto data: {e}")
+                            continue
+                    
+                    logger.info(f"Stored {stored_count} new/updated cryptocurrencies in database")
                 
                 # Re-récupérer les données mises à jour
                 cached_cryptos = await self._get_cached_crypto_data(required_fields or [])
             
-            # 3. Programmer l'enrichissement en arrière-plan si nécessaire
+            # 4. Programmer l'enrichissement en arrière-plan si nécessaire
             await self._schedule_background_enrichment()
             
-            # 4. Convertir en format API
-            result = await self._convert_to_api_format(cached_cryptos)
+            # 5. Convertir en format API
+            api_cryptos = await self._convert_to_api_format(cached_cryptos)
             
-            self.last_update = datetime.utcnow()
-            logger.info(f"Data aggregation completed: {len(result)} cryptocurrencies")
-            
-            return result
+            logger.info(f"Data aggregation completed: {len(api_cryptos)} cryptocurrencies ready")
+            return api_cryptos
             
         except Exception as e:
-            logger.error(f"Error in intelligent data aggregation: {e}")
-            # Fallback vers l'ancienne méthode
-            return await self._fallback_aggregation()
+            logger.error(f"Error in data aggregation: {e}")
+            return []
+    
+    def _get_load_balancing_strategy(self, request_size: int) -> str:
+        """Determine the best load balancing strategy based on request size"""
+        if request_size <= self.load_balancing_thresholds['small']:
+            return 'small'
+        elif request_size <= self.load_balancing_thresholds['medium']:
+            return 'medium'
+        elif request_size <= self.load_balancing_thresholds['large']:
+            return 'large'
+        else:
+            return 'xlarge'
+    
+    async def _fetch_data_by_strategy(self, strategy: str, request_size: int = None) -> List[Dict[str, Any]]:
+        """Fetch data using strategy-specific approach"""
+        try:
+            logger.info(f"Fetching data using {strategy} strategy")
+            
+            if strategy == 'small':
+                # Small requests: Use lightweight fallback APIs
+                return await self._fetch_small_dataset()
+                
+            elif strategy == 'medium':
+                # Medium requests: CryptoCompare + selective others
+                return await self._fetch_medium_dataset()
+                
+            elif strategy == 'large':
+                # Large requests: CryptoCompare primary + complementary sources
+                return await self._fetch_large_dataset()
+                
+            else:  # xlarge
+                # Very large requests: Full CryptoCompare + selected high-quality sources
+                return await self._fetch_xlarge_dataset()
+                
+        except Exception as e:
+            logger.error(f"Error in strategy-based fetching: {e}")
+            return []
+    
+    async def _fetch_small_dataset(self) -> List[Dict[str, Any]]:
+        """Optimized for ≤100 cryptos: Use lightweight APIs"""
+        try:
+            tasks = []
+            
+            # Use fallback APIs primarily (CoinGecko, Coinlore)
+            tasks.append(('fallback', self._get_fallback_data()))
+            
+            # Add Binance if available (good for top cryptos)
+            if self.binance_service.is_available():
+                tasks.append(('binance', self._get_binance_data()))
+            
+            results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
+            
+            combined_data = {}
+            for i, (source_name, _) in enumerate(tasks):
+                result = results[i]
+                if isinstance(result, list):
+                    for crypto in result:
+                        symbol = crypto.get('symbol', '').upper()
+                        if symbol and symbol not in combined_data:
+                            combined_data[symbol] = crypto
+            
+            return list(combined_data.values())
+            
+        except Exception as e:
+            logger.error(f"Error in small dataset fetch: {e}")
+            return []
+    
+    async def _fetch_medium_dataset(self) -> List[Dict[str, Any]]:
+        """Optimized for 101-500 cryptos: CryptoCompare + selective others"""
+        try:
+            tasks = []
+            
+            # CryptoCompare as primary (can handle 500 efficiently)
+            tasks.append(('cryptocompare', self._get_cryptocompare_data()))
+            
+            # Fallback for additional coverage
+            tasks.append(('fallback', self._get_fallback_data()))
+            
+            # Binance for high-quality top cryptos
+            if self.binance_service.is_available():
+                tasks.append(('binance', self._get_binance_data()))
+            
+            results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
+            
+            # Merge with CryptoCompare priority
+            return await self._merge_results_with_priority(tasks, results, primary='cryptocompare')
+            
+        except Exception as e:
+            logger.error(f"Error in medium dataset fetch: {e}")
+            return []
+    
+    async def _fetch_large_dataset(self) -> List[Dict[str, Any]]:
+        """Optimized for 501-1500 cryptos: CryptoCompare primary + complementary"""
+        try:
+            # CryptoCompare can handle large datasets efficiently
+            cryptocompare_data = await self._get_cryptocompare_data()
+            
+            # Get complementary data for additional coverage
+            complementary_tasks = [
+                ('fallback', self._get_fallback_data())
+            ]
+            
+            if self.binance_service.is_available():
+                complementary_tasks.append(('binance', self._get_binance_data()))
+            
+            complementary_results = await asyncio.gather(
+                *[task[1] for task in complementary_tasks], 
+                return_exceptions=True
+            )
+            
+            # Merge data with CryptoCompare as primary
+            all_data = {}
+            
+            # Add CryptoCompare data first (highest priority)
+            for crypto in cryptocompare_data:
+                symbol = crypto.get('symbol', '').upper()
+                if symbol:
+                    all_data[symbol] = crypto
+            
+            # Add complementary data for missing symbols
+            for i, (source_name, _) in enumerate(complementary_tasks):
+                result = complementary_results[i]
+                if isinstance(result, list):
+                    for crypto in result:
+                        symbol = crypto.get('symbol', '').upper()
+                        if symbol and symbol not in all_data:
+                            all_data[symbol] = crypto
+            
+            logger.info(f"Large dataset: {len(all_data)} cryptos (CryptoCompare primary)")
+            return list(all_data.values())
+            
+        except Exception as e:
+            logger.error(f"Error in large dataset fetch: {e}")
+            return []
+    
+    async def _fetch_xlarge_dataset(self) -> List[Dict[str, Any]]:
+        """Optimized for 1500+ cryptos: Full CryptoCompare + selective high-quality sources"""
+        try:
+            # Use CryptoCompare at maximum capacity
+            logger.info("Fetching XL dataset using CryptoCompare at full capacity")
+            
+            cryptocompare_data = await self._get_cryptocompare_data()
+            
+            # Only add Binance for additional top-quality data
+            additional_data = []
+            if self.binance_service.is_available():
+                binance_data = await self._get_binance_data()
+                if isinstance(binance_data, list):
+                    additional_data.extend(binance_data)
+            
+            # Merge with CryptoCompare priority
+            all_data = {}
+            
+            # CryptoCompare first
+            for crypto in cryptocompare_data:
+                symbol = crypto.get('symbol', '').upper()
+                if symbol:
+                    all_data[symbol] = crypto
+            
+            # Add high-quality additional data
+            for crypto in additional_data:
+                symbol = crypto.get('symbol', '').upper()
+                if symbol and symbol not in all_data:
+                    all_data[symbol] = crypto
+            
+            logger.info(f"XL dataset: {len(all_data)} cryptos (CryptoCompare optimized)")
+            return list(all_data.values())
+            
+        except Exception as e:
+            logger.error(f"Error in XL dataset fetch: {e}")
+            return []
+    
+    async def _merge_results_with_priority(self, tasks, results, primary: str) -> List[Dict[str, Any]]:
+        """Merge results from multiple sources with priority system"""
+        all_data = {}
+        
+        # Find primary source index
+        primary_index = None
+        for i, (source_name, _) in enumerate(tasks):
+            if source_name == primary:
+                primary_index = i
+                break
+        
+        # Process primary source first
+        if primary_index is not None and primary_index < len(results):
+            primary_result = results[primary_index]
+            if isinstance(primary_result, list):
+                for crypto in primary_result:
+                    symbol = crypto.get('symbol', '').upper()
+                    if symbol:
+                        all_data[symbol] = crypto
+        
+        # Add data from other sources for missing symbols
+        for i, (source_name, _) in enumerate(tasks):
+            if i == primary_index:
+                continue
+                
+            result = results[i]
+            if isinstance(result, list):
+                for crypto in result:
+                    symbol = crypto.get('symbol', '').upper()
+                    if symbol and symbol not in all_data:
+                        all_data[symbol] = crypto
+        
+        return list(all_data.values())
     
     async def _get_cached_crypto_data(self, required_fields: List[str]) -> List[CryptoDataDB]:
         """Récupère les données crypto valides depuis le cache"""
