@@ -34,6 +34,12 @@ class DataAggregationService:
         self.target_crypto_count = 2000  # Increased target
         self.max_analysis_limit = 5000  # Maximum cryptos that can be analyzed at once
         
+        # Background refresh management
+        self.background_refresh_tasks = {}  # Track active background tasks
+        self.refresh_status = "idle"  # idle, running, completed, failed
+        self.last_refresh_duration = None
+        self.last_refresh_error = None
+        
     def set_scoring_service(self, scoring_service):
         """Configure the scoring service for precomputation"""
         if hasattr(self, 'precompute_service') and self.precompute_service:
