@@ -387,6 +387,10 @@ class DataAggregationService:
         if hasattr(self, 'precompute_service') and self.precompute_service:
             self.precompute_service.scoring_service = scoring_service
     
+    def set_db_client(self, db_client):
+        """Configure le client de base de données"""
+        self.db_cache.set_db_client(db_client)
+    
     async def _get_all_available_symbols(self) -> List[str]:
         """Récupère la liste de tous les symboles disponibles depuis les APIs"""
         try:
