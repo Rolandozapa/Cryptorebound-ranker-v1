@@ -210,7 +210,8 @@ const CryptoRebound = () => {
       const response = await axios.get(`${API}/cryptos/multi-period-analysis`, {
         params: {
           limit: 15,
-          periods: ['24h', '7d', '30d']
+          short_periods: ['24h', '7d', '30d'],
+          long_periods: ['90d', '180d', '270d', '365d']
         }
       });
       
