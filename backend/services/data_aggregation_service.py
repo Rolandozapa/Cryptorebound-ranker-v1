@@ -206,7 +206,7 @@ class DataAggregationService:
             logger.error(f"Error retrieving cached crypto data: {e}")
             return []
     
-    async def _get_cached_crypto_data_limited(self, required_fields: List[str], limit: int = 500) -> List:
+    async def _get_cached_crypto_data_limited(self, required_fields: List[str], limit: int = 1000) -> List:
         """Récupère une quantité limitée de cryptos depuis le cache pour optimiser les performances"""
         try:
             if self.db_cache.db is None:
