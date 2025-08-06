@@ -717,9 +717,10 @@ async def get_crypto_ranking(
     period: str = Query("24h", description="Time period for ranking"),
     limit: int = Query(50, description="Number of results to return", ge=1, le=10000),
     offset: int = Query(0, description="Offset for pagination", ge=0),
-    force_refresh: bool = Query(False, description="Force refresh data")
+    force_refresh: bool = Query(False, description="Force refresh data"),
+    fix_historical: bool = Query(True, description="Fix missing/incorrect historical price data")
 ):
-    """Get cryptocurrency ranking with advanced scoring - OPTIMIZED VERSION"""
+    """Get cryptocurrency ranking with enhanced historical data accuracy"""
     try:
         logger.info(f"Getting crypto ranking: period={period}, limit={limit}, offset={offset}, force_refresh={force_refresh}")
         
