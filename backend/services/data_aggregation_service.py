@@ -288,6 +288,27 @@ class DataAggregationService:
             logger.error(f"Error in enhanced parallel data fetch: {e}")
             return []
     
+    async def _get_coinmarketcap_data(self) -> List[Dict[str, Any]]:
+        """Get comprehensive data from CoinMarketCap (highest priority premium source)"""
+        try:
+            logger.info("Fetching comprehensive data from CoinMarketCap")
+            
+            # CoinMarketCap can handle very large datasets efficiently
+            limit = min(2000, self.target_crypto_count)  # Up to 2000 cryptos - très performant
+            
+            crypto_data = await self.coinmarketcap_service.get_comprehensive_data(limit)
+            
+            if crypto_data:
+                logger.info(f"Retrieved {len(crypto_data)} cryptocurrencies from CoinMarketCap")
+                return crypto_data
+            else:
+                logger.warning("No data received from CoinMarketCap")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error fetching data from CoinMarketCap: {e}")
+            return []
+    
     async def _get_cryptocompare_data(self) -> List[Dict[str, Any]]:
         """Get comprehensive data from CryptoCompare (prioritized for large datasets)"""
         try:
