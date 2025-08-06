@@ -40,10 +40,139 @@ class DataAggregationService:
         self.last_refresh_duration = None
         self.last_refresh_error = None
         
-    def set_scoring_service(self, scoring_service):
-        """Configure the scoring service for precomputation"""
-        if hasattr(self, 'precompute_service') and self.precompute_service:
-            self.precompute_service.scoring_service = scoring_service
+    
+    async def start_background_refresh(self, force: bool = False, periods: List[str] = None) -> str:
+        """Start background refresh and return task ID immediately"""
+        try:
+            task_id = str(uuid.uuid4())
+            
+            # Don't start new refresh if one is already running
+            if self.refresh_status == "running":
+                return None  # Refresh already in progress
+            
+            self.refresh_status = "running"
+            self.last_refresh_error = None
+            
+            # Start background task
+            task = asyncio.create_task(
+                self._background_refresh_worker(task_id, force, periods or ['24h', '7d', '30d'])
+            )
+            self.background_refresh_tasks[task_id] = task
+            
+            logger.info(f"Started background refresh task: {task_id}")
+            return task_id
+            
+        except Exception as e:
+            logger.error(f"Error starting background refresh: {e}")
+            self.refresh_status = "failed"
+            self.last_refresh_error = str(e)
+            return None
+    
+    async def _background_refresh_worker(self, task_id: str, force: bool, periods: List[str]):
+        """Background worker that does the actual refresh"""
+        start_time = datetime.utcnow()
+        
+        try:
+            logger.info(f"Background refresh {task_id} starting...")
+            
+            # Get fresh data using parallel requests
+            fresh_cryptos = await self._fetch_fresh_data_parallel()
+            
+            if not fresh_cryptos:
+                raise Exception("No fresh data obtained from external APIs")
+            
+            logger.info(f"Background refresh {task_id}: Got {len(fresh_cryptos)} fresh cryptos")
+            
+            # Store in database with quality validation
+            stored_count = 0
+            for crypto_data in fresh_cryptos:
+                try:
+                    await self.db_cache.store_crypto_data(crypto_data, validate=True)
+                    stored_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to store crypto data: {e}")
+                    continue
+            
+            logger.info(f"Background refresh {task_id}: Stored {stored_count} cryptos")
+            
+            # Update last refresh time
+            self.last_update = datetime.utcnow()
+            duration = (self.last_update - start_time).total_seconds()
+            self.last_refresh_duration = duration
+            
+            self.refresh_status = "completed"
+            logger.info(f"Background refresh {task_id} completed in {duration:.1f}s")
+            
+        except Exception as e:
+            self.refresh_status = "failed"
+            self.last_refresh_error = str(e)
+            logger.error(f"Background refresh {task_id} failed: {e}")
+            
+        finally:
+            # Clean up task
+            if task_id in self.background_refresh_tasks:
+                del self.background_refresh_tasks[task_id]
+    
+    async def _fetch_fresh_data_parallel(self) -> List[Dict[str, Any]]:
+        """Fetch data from all sources in parallel for better performance"""
+        try:
+            # Create tasks for parallel execution
+            tasks = []
+            
+            # Binance (if available)
+            if self.binance_service.is_available():
+                tasks.append(self._get_binance_data())
+            
+            # Yahoo Finance
+            tasks.append(self._get_yahoo_data())
+            
+            # Fallback services (CoinGecko, Coinlore)
+            tasks.append(self._get_fallback_data())
+            
+            # Execute all tasks in parallel with timeout
+            logger.info(f"Starting {len(tasks)} parallel API requests...")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Combine results
+            all_crypto_data = {}
+            
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.warning(f"API source {i} failed: {result}")
+                    continue
+                
+                if isinstance(result, list):
+                    for crypto_data in result:
+                        symbol = crypto_data.get('symbol', '').upper()
+                        if symbol:
+                            if symbol not in all_crypto_data:
+                                all_crypto_data[symbol] = crypto_data
+                            else:
+                                # Merge data from multiple sources
+                                all_crypto_data[symbol] = self._merge_crypto_data(
+                                    all_crypto_data[symbol], 
+                                    crypto_data
+                                )
+            
+            result_list = list(all_crypto_data.values())
+            logger.info(f"Parallel fetch completed: {len(result_list)} unique cryptocurrencies")
+            
+            return result_list
+            
+        except Exception as e:
+            logger.error(f"Error in parallel data fetch: {e}")
+            return []
+    
+    def get_refresh_status(self) -> Dict[str, Any]:
+        """Get current refresh status"""
+        return {
+            'status': self.refresh_status,
+            'active_tasks': len(self.background_refresh_tasks),
+            'last_update': self.last_update.isoformat() if self.last_update else None,
+            'last_duration_seconds': self.last_refresh_duration,
+            'last_error': self.last_refresh_error,
+            'next_auto_refresh': (self.last_update + self.update_interval).isoformat() if self.last_update else None
+        }
     
     async def get_optimized_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False) -> List[CryptoCurrency]:
         """
