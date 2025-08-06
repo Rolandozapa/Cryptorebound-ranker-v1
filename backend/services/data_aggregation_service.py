@@ -516,52 +516,60 @@ class DataAggregationService:
             return []
     
     async def _fetch_small_dataset(self) -> List[Dict[str, Any]]:
-        """Optimized for ≤100 cryptos: Use lightweight APIs"""
+        """Optimized for ≤100 cryptos: Use lightweight and reliable APIs"""
         try:
             tasks = []
             
-            # Use fallback APIs primarily (CoinGecko, Coinlore)
+            # Primary: Use CoinPaprika (free, comprehensive)
+            tasks.append(('coinpaprika', self._get_coinpaprika_data()))
+            
+            # Secondary: Use fallback APIs (CoinGecko, Coinlore)
             tasks.append(('fallback', self._get_fallback_data()))
             
             # Add Binance if available (good for top cryptos)
             if self.binance_service.is_available():
                 tasks.append(('binance', self._get_binance_data()))
             
+            # Add Bitfinex for additional coverage
+            tasks.append(('bitfinex', self._get_bitfinex_data()))
+            
             results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
             
-            combined_data = {}
-            for i, (source_name, _) in enumerate(tasks):
-                result = results[i]
-                if isinstance(result, list):
-                    for crypto in result:
-                        symbol = crypto.get('symbol', '').upper()
-                        if symbol and symbol not in combined_data:
-                            combined_data[symbol] = crypto
-            
-            return list(combined_data.values())
+            # Merge results with CoinPaprika as primary
+            return await self._merge_results_with_priority(tasks, results, primary='coinpaprika')
             
         except Exception as e:
             logger.error(f"Error in small dataset fetch: {e}")
             return []
     
     async def _fetch_medium_dataset(self) -> List[Dict[str, Any]]:
-        """Optimized for 101-500 cryptos: CryptoCompare + selective others"""
+        """Optimized for 101-500 cryptos: Mixed high-quality sources"""
         try:
             tasks = []
             
-            # CryptoCompare as primary (can handle 500 efficiently)
+            # Primary: CryptoCompare (proven reliable for medium datasets)
             tasks.append(('cryptocompare', self._get_cryptocompare_data()))
             
-            # Fallback for additional coverage
-            tasks.append(('fallback', self._get_fallback_data()))
+            # Secondary: CoinPaprika (comprehensive free coverage)
+            tasks.append(('coinpaprika', self._get_coinpaprika_data()))
+            
+            # Add CoinAPI if available (premium data)
+            if self.coinapi_service.is_available():
+                tasks.append(('coinapi', self._get_coinapi_data()))
+            
+            # Complement with Bitfinex for exchange data
+            tasks.append(('bitfinex', self._get_bitfinex_data()))
             
             # Binance for high-quality top cryptos
             if self.binance_service.is_available():
                 tasks.append(('binance', self._get_binance_data()))
             
+            # Fallback sources
+            tasks.append(('fallback', self._get_fallback_data()))
+            
             results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
             
-            # Merge with CryptoCompare priority
+            # Merge with CryptoCompare as primary
             return await self._merge_results_with_priority(tasks, results, primary='cryptocompare')
             
         except Exception as e:
@@ -569,43 +577,48 @@ class DataAggregationService:
             return []
     
     async def _fetch_large_dataset(self) -> List[Dict[str, Any]]:
-        """Optimized for 501-1500 cryptos: CryptoCompare primary + complementary"""
+        """Optimized for 501-1500 cryptos: Heavy APIs with comprehensive coverage"""
         try:
-            # CryptoCompare can handle large datasets efficiently
-            cryptocompare_data = await self._get_cryptocompare_data()
+            tasks = []
             
-            # Get complementary data for additional coverage
-            complementary_tasks = [
-                ('fallback', self._get_fallback_data())
-            ]
+            # Tier 1: Premium/Most reliable sources
+            tasks.append(('cryptocompare', self._get_cryptocompare_data()))
+            if self.coinapi_service.is_available():
+                tasks.append(('coinapi', self._get_coinapi_data()))
             
+            # Tier 2: High-coverage free sources
+            tasks.append(('coinpaprika', self._get_coinpaprika_data()))
+            
+            # Tier 3: Exchange data
+            tasks.append(('bitfinex', self._get_bitfinex_data()))
             if self.binance_service.is_available():
-                complementary_tasks.append(('binance', self._get_binance_data()))
+                tasks.append(('binance', self._get_binance_data()))
             
-            complementary_results = await asyncio.gather(
-                *[task[1] for task in complementary_tasks], 
-                return_exceptions=True
-            )
+            # Tier 4: Fallback for additional coverage
+            tasks.append(('fallback', self._get_fallback_data()))
             
-            # Merge data with CryptoCompare as primary
+            results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
+            
+            # Use advanced merging logic for large datasets
             all_data = {}
             
-            # Add CryptoCompare data first (highest priority)
-            for crypto in cryptocompare_data:
-                symbol = crypto.get('symbol', '').upper()
-                if symbol:
-                    all_data[symbol] = crypto
+            # Process in order of preference
+            priority_order = ['cryptocompare', 'coinapi', 'coinpaprika', 'bitfinex', 'binance', 'fallback']
             
-            # Add complementary data for missing symbols
-            for i, (source_name, _) in enumerate(complementary_tasks):
-                result = complementary_results[i]
-                if isinstance(result, list):
-                    for crypto in result:
-                        symbol = crypto.get('symbol', '').upper()
-                        if symbol and symbol not in all_data:
-                            all_data[symbol] = crypto
+            for priority_source in priority_order:
+                # Find this source in tasks
+                for i, (source_name, _) in enumerate(tasks):
+                    if source_name == priority_source and i < len(results):
+                        result = results[i]
+                        if isinstance(result, list):
+                            logger.info(f"Processing {len(result)} cryptos from {source_name} (large dataset)")
+                            for crypto in result:
+                                symbol = crypto.get('symbol', '').upper()
+                                if symbol and symbol not in all_data:
+                                    all_data[symbol] = crypto
+                        break
             
-            logger.info(f"Large dataset: {len(all_data)} cryptos (CryptoCompare primary)")
+            logger.info(f"Large dataset: {len(all_data)} unique cryptos")
             return list(all_data.values())
             
         except Exception as e:
@@ -613,37 +626,74 @@ class DataAggregationService:
             return []
     
     async def _fetch_xlarge_dataset(self) -> List[Dict[str, Any]]:
-        """Optimized for 1500+ cryptos: Full CryptoCompare + selective high-quality sources"""
+        """Optimized for 1500+ cryptos: All APIs with intelligent prioritization"""
         try:
-            # Use CryptoCompare at maximum capacity
-            logger.info("Fetching XL dataset using CryptoCompare at full capacity")
+            tasks = []
             
-            cryptocompare_data = await self._get_cryptocompare_data()
+            # Use all available APIs for maximum coverage
+            tasks.append(('cryptocompare', self._get_cryptocompare_data()))
             
-            # Only add Binance for additional top-quality data
-            additional_data = []
+            if self.coinapi_service.is_available():
+                tasks.append(('coinapi', self._get_coinapi_data()))
+            
+            tasks.append(('coinpaprika', self._get_coinpaprika_data()))
+            tasks.append(('bitfinex', self._get_bitfinex_data()))
+            
             if self.binance_service.is_available():
-                binance_data = await self._get_binance_data()
-                if isinstance(binance_data, list):
-                    additional_data.extend(binance_data)
+                tasks.append(('binance', self._get_binance_data()))
             
-            # Merge with CryptoCompare priority
+            tasks.append(('yahoo', self._get_yahoo_data()))
+            tasks.append(('fallback', self._get_fallback_data()))
+            
+            logger.info(f"XL dataset: Using all {len(tasks)} available APIs")
+            
+            results = await asyncio.gather(*[task[1] for task in tasks], return_exceptions=True)
+            
+            # Advanced merging with quality scoring
             all_data = {}
+            source_quality = {
+                'cryptocompare': 10,
+                'coinapi': 9,
+                'coinpaprika': 8,
+                'bitfinex': 7,
+                'binance': 6,
+                'yahoo': 5,
+                'fallback': 4
+            }
             
-            # CryptoCompare first
-            for crypto in cryptocompare_data:
-                symbol = crypto.get('symbol', '').upper()
-                if symbol:
-                    all_data[symbol] = crypto
+            # Process results
+            for i, (source_name, _) in enumerate(tasks):
+                result = results[i]
+                if isinstance(result, list):
+                    logger.info(f"Processing {len(result)} cryptos from {source_name} (XL dataset)")
+                    quality_score = source_quality.get(source_name, 1)
+                    
+                    for crypto in result:
+                        symbol = crypto.get('symbol', '').upper()
+                        if symbol:
+                            if symbol not in all_data:
+                                crypto['source_quality_score'] = quality_score
+                                all_data[symbol] = crypto
+                            else:
+                                # Keep higher quality source
+                                existing_quality = all_data[symbol].get('source_quality_score', 0)
+                                if quality_score > existing_quality:
+                                    crypto['source_quality_score'] = quality_score
+                                    # Merge some data but keep new as primary
+                                    merged = self._merge_crypto_data(all_data[symbol], crypto)
+                                    merged['source_quality_score'] = quality_score
+                                    all_data[symbol] = merged
             
-            # Add high-quality additional data
-            for crypto in additional_data:
-                symbol = crypto.get('symbol', '').upper()
-                if symbol and symbol not in all_data:
-                    all_data[symbol] = crypto
+            result_list = list(all_data.values())
             
-            logger.info(f"XL dataset: {len(all_data)} cryptos (CryptoCompare optimized)")
-            return list(all_data.values())
+            # Sort by quality and market cap
+            result_list.sort(key=lambda x: (
+                -x.get('source_quality_score', 0),
+                -(x.get('market_cap_usd', 0) or 0)
+            ))
+            
+            logger.info(f"XL dataset complete: {len(result_list)} unique cryptos from {len(tasks)} APIs")
+            return result_list
             
         except Exception as e:
             logger.error(f"Error in XL dataset fetch: {e}")
