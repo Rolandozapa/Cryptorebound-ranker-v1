@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for CryptoRebound Enhanced API Integrations and Intelligent Caching
-Tests the new CoinAPI, CoinPaprika, and Bitfinex integrations with period-based intelligent caching
+Backend API Testing for CryptoRebound Optimized Performance with 8 API Sources
+Tests the optimized CryptoRebound backend with performance enhancements, new CoinMarketCap integration,
+enhanced parallel processing (15 concurrent requests), improved caching thresholds, and 8 API sources
 """
 
 import requests
