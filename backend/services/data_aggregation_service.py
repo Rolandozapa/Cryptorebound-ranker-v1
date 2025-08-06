@@ -215,7 +215,7 @@ class DataAggregationService:
             # Récupérer seulement le nombre nécessaire de cryptos avec qualité acceptable
             cursor = self.db_cache.db.crypto_data.find({
                 "data_quality": {"$ne": "invalid"},
-                "quality_score": {"$gte": 40},  # Score minimum plus bas pour avoir plus de résultats
+                "quality_score": {"$gte": 35},  # Slightly lower minimum for more results
                 "price_usd": {"$gt": 0}
             }).sort([
                 ("quality_score", -1),
