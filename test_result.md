@@ -210,7 +210,8 @@ test_plan:
     - "Add max analyzing catch box UI component"
     - "Update display limit options for higher crypto counts"
     - "Integrate dynamic limit fetching from backend"
-  stuck_tasks: []
+  stuck_tasks:
+    - "Crypto data refresh performance optimization"
   test_all: false
   test_priority: "high_first"
 
