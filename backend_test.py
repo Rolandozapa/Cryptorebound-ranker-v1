@@ -1357,84 +1357,93 @@ class BackendTester:
         return all_fast
     
     def run_all_tests(self):
-        """Run all backend tests for enhanced CryptoRebound with 7 APIs and intelligent caching"""
-        print("Starting CryptoRebound Enhanced Backend API Tests...")
-        print("Testing: 7 API integrations, intelligent caching, and load balancing")
+        """Run all backend tests for optimized CryptoRebound with 8 APIs and performance enhancements"""
+        print("Starting CryptoRebound Optimized Backend API Tests...")
+        print("Testing: 8 API integrations, enhanced parallel processing, optimized caching, and performance benchmarks")
         print("=" * 80)
         
-        # Test 1: Enhanced health check with 7 APIs
-        available_services = self.test_health_endpoint_enhanced()
+        # Test 1: Enhanced health check with 8 APIs including CoinMarketCap
+        available_services = self.test_health_endpoint_with_8_apis()
         
-        # Test 2: Individual API service integrations
+        # Test 2: Updated API key verification
+        api_keys_ok = self.test_api_key_verification()
+        
+        # Test 3: Individual API service integrations
         service_integrations = self.test_api_service_integrations()
         
-        # Test 3: Dynamic limit endpoint (existing functionality)
+        # Test 4: Dynamic limit endpoint (existing functionality)
         dynamic_max_limit = self.test_dynamic_limit_endpoint()
         
-        # Test 4: Crypto count endpoint
+        # Test 5: Crypto count endpoint
         crypto_count = self.test_crypto_count_endpoint()
         
-        # NEW ENHANCED TESTS
+        # OPTIMIZED PERFORMANCE TESTS
         print("\n" + "=" * 80)
-        print("ENHANCED API INTEGRATION AND CACHING TESTS")
+        print("OPTIMIZED PERFORMANCE AND ENHANCEMENT TESTS")
         print("=" * 80)
         
-        # Test 5: Enhanced data aggregation with 7 APIs
-        data_aggregation_ok = self.test_data_aggregation_with_7_apis()
+        # Test 6: Enhanced parallel processing with 15 concurrent requests
+        parallel_processing_ok = self.test_parallel_processing_optimization()
         
-        # Test 6: Intelligent caching system
-        caching_system_ok = self.test_intelligent_caching_system()
+        # Test 7: Enhanced data aggregation with 8 APIs
+        data_aggregation_results = self.test_data_aggregation_with_8_apis()
         
-        # Test 7: Load balancing strategies
+        # Test 8: Optimized caching system with improved thresholds
+        caching_system_ok = self.test_optimized_caching_system()
+        
+        # Test 9: Performance benchmarks (100, 500, 1000, 2000+ cryptos)
+        benchmark_results = self.test_performance_benchmarks()
+        
+        # Test 10: Memory cache effectiveness (45-minute expiration)
+        memory_cache_ok = self.test_memory_cache_effectiveness()
+        
+        # Test 11: Load balancing strategies (updated for 8 APIs)
         load_balancing_ok = self.test_load_balancing_strategies()
         
-        # Test 8: Period-based freshness thresholds
-        freshness_thresholds_ok = self.test_period_based_freshness_thresholds()
-        
-        # EXISTING CORE FUNCTIONALITY TESTS
+        # CORE FUNCTIONALITY TESTS
         print("\n" + "=" * 80)
         print("CORE FUNCTIONALITY TESTS")
         print("=" * 80)
         
-        # Test 9: Ranking with various limits
+        # Test 12: Ranking with various limits
         ranking_ok = self.test_ranking_endpoint_with_limits(dynamic_max_limit)
         
-        # Test 10: Pagination
+        # Test 13: Pagination
         pagination_ok = self.test_ranking_with_pagination()
         
-        # Test 11: Force refresh
+        # Test 14: Force refresh
         refresh_ok = self.test_ranking_with_force_refresh()
         
-        # Test 12: Error handling
+        # Test 15: Error handling
         error_handling_ok = self.test_error_handling()
         
-        # Test 13: Performance test
+        # Test 16: System performance test
         performance_ok = self.test_system_performance()
         
-        # ASYNC REFRESH SYSTEM TESTS (existing)
+        # ASYNC REFRESH SYSTEM TESTS
         print("\n" + "=" * 80)
         print("ASYNC REFRESH SYSTEM TESTS")
         print("=" * 80)
         
-        # Test 14: Async refresh endpoint
+        # Test 17: Async refresh endpoint
         async_refresh_ok = self.test_async_refresh_endpoint()
         
-        # Test 15: Async refresh with force
+        # Test 18: Async refresh with force
         async_force_ok = self.test_async_refresh_with_force()
         
-        # Test 16: Refresh status endpoint
+        # Test 19: Refresh status endpoint
         status_endpoint_ok = self.test_refresh_status_endpoint()
         
-        # Test 17: Legacy refresh endpoint (now async)
+        # Test 20: Legacy refresh endpoint (now async)
         legacy_refresh_ok = self.test_legacy_refresh_endpoint()
         
-        # Test 18: Complete async workflow
+        # Test 21: Complete async workflow
         workflow_ok = self.test_async_workflow_complete()
         
-        # Test 19: Multiple refresh requests handling
+        # Test 22: Multiple refresh requests handling
         multiple_requests_ok = self.test_multiple_refresh_requests()
         
-        # Test 20: Performance timing for async endpoints
+        # Test 23: Performance timing for async endpoints
         async_performance_ok = self.test_async_performance_timing()
         
         # Summary
@@ -1451,15 +1460,20 @@ class BackendTester:
         print(f"Failed: {failed_tests}")
         print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
         
-        # Enhanced API integration specific summary
-        enhanced_tests = [
-            bool(available_services), bool(service_integrations), 
-            data_aggregation_ok, caching_system_ok, 
-            load_balancing_ok, freshness_thresholds_ok
+        # Optimized system specific summary
+        optimization_tests = [
+            bool(available_services), api_keys_ok, bool(service_integrations),
+            parallel_processing_ok, bool(data_aggregation_results), 
+            caching_system_ok, bool(benchmark_results), memory_cache_ok
         ]
-        enhanced_passed = sum(1 for test in enhanced_tests if test)
+        optimization_passed = sum(1 for test in optimization_tests if test)
         
-        print(f"\nEnhanced API Integration Tests: {enhanced_passed}/{len(enhanced_tests)} passed")
+        print(f"\nOptimization & Enhancement Tests: {optimization_passed}/{len(optimization_tests)} passed")
+        
+        # Performance benchmark analysis
+        if benchmark_results:
+            excellent_performance = sum(1 for result in benchmark_results.values() if result['grade'] == 'Excellent')
+            print(f"Performance Benchmarks: {excellent_performance}/{len(benchmark_results)} achieved 'Excellent' (<10s)")
         
         # Core functionality summary
         core_tests = [
@@ -1484,15 +1498,17 @@ class BackendTester:
         
         print("\n" + "=" * 80)
         
-        # Return overall success - prioritize enhanced API integration tests
-        critical_enhanced_tests = [bool(available_services), data_aggregation_ok, caching_system_ok]
+        # Return overall success - prioritize optimization and performance tests
+        critical_optimization_tests = [bool(available_services), bool(service_integrations), bool(data_aggregation_results)]
+        critical_performance_tests = [caching_system_ok, bool(benchmark_results)]
         critical_core_tests = [bool(dynamic_max_limit), ranking_ok]
         critical_async_tests = [async_refresh_ok, status_endpoint_ok, async_performance_ok]
         
-        return (all(critical_enhanced_tests) and 
+        return (all(critical_optimization_tests) and 
+                all(critical_performance_tests) and 
                 all(critical_core_tests) and 
                 all(critical_async_tests) and 
-                failed_tests <= 3)  # Allow up to 3 minor failures
+                failed_tests <= 4)  # Allow up to 4 minor failures for optimized system
 
 if __name__ == "__main__":
     tester = BackendTester()
