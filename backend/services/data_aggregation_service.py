@@ -10,6 +10,7 @@ from services.fallback_crypto_service import FallbackCryptoService
 from services.database_cache_service import DatabaseCacheService
 from services.data_enrichment_service import DataEnrichmentService
 from services.ranking_precompute_service import RankingPrecomputeService
+from services.historical_price_service import HistoricalPriceService
 import uuid
 
 logger = logging.getLogger(__name__)
