@@ -80,6 +80,19 @@ class RefreshStatusResponse(BaseModel):
     last_error: Optional[str] = None
     next_auto_refresh: Optional[str] = None
 
+# Multi-period analysis models
+class MultiPeriodCrypto(BaseModel):
+    symbol: str
+    name: str
+    price_usd: float
+    market_cap_usd: Optional[float] = None
+    average_score: float
+    period_scores: Dict[str, float]
+    best_period: str
+    worst_period: str
+    consistency_score: float
+    rank: int
+
 # Legacy endpoints for backwards compatibility
 @api_router.get("/")
 async def root():
