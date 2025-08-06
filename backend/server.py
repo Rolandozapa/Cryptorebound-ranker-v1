@@ -97,89 +97,98 @@ async def get_status_checks():
     status_checks = await db.status_checks.find().to_list(1000)
     return [StatusCheck(**status_check) for status_check in status_checks]
 
-@api_router.get("/system/dynamic-limit", response_model=DynamicLimitResponse)
-async def get_dynamic_analysis_limit():
-    """Get dynamic analysis limit based on current system resources and memory"""
+@api_router.post("/cryptos/refresh-async", response_model=BackgroundRefreshResponse)
+async def start_background_crypto_refresh(
+    force: bool = Query(False, description="Force refresh from external APIs"),
+    periods: List[str] = Query([], description="Specific periods to refresh")
+):
+    """Start background cryptocurrency data refresh - returns immediately"""
     try:
-        # Get system resources
-        memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent(interval=1)
-        available_memory_mb = memory.available / (1024 * 1024)
+        logger.info(f"Starting background crypto refresh: force={force}, periods={periods}")
         
-        # Calculate recommended limits based on available memory
-        # Estimate: each crypto uses ~1KB in memory for analysis
-        base_crypto_memory_kb = 1  # Base memory per crypto
-        memory_safety_factor = 0.7  # Use 70% of available memory max
+        # Start background refresh
+        task_id = await data_service.start_background_refresh(force=force, periods=periods)
         
-        # Memory-based calculation
-        memory_based_limit = int((available_memory_mb * 1024 * memory_safety_factor) / base_crypto_memory_kb)
-        
-        # Performance-based recommendations
-        if cpu_percent > 80:
-            performance_factor = 0.5  # High CPU usage, reduce limit
-            performance_mode = "optimal"
-            current_load = "high"
-        elif cpu_percent > 50:
-            performance_factor = 0.8  # Medium CPU usage
-            performance_mode = "balanced" 
-            current_load = "medium"
+        if task_id:
+            return BackgroundRefreshResponse(
+                status="started",
+                task_id=task_id,
+                message="Background refresh started successfully",
+                estimated_duration_seconds=60 if force else 30
+            )
         else:
-            performance_factor = 1.0  # Low CPU usage, allow full capacity
-            performance_mode = "maximum"
-            current_load = "low"
+            # Check current status
+            refresh_status = data_service.get_refresh_status()
+            if refresh_status['status'] == 'running':
+                return BackgroundRefreshResponse(
+                    status="already_running",
+                    message="Background refresh is already in progress",
+                    estimated_duration_seconds=30
+                )
+            else:
+                return BackgroundRefreshResponse(
+                    status="failed",
+                    message="Failed to start background refresh",
+                    estimated_duration_seconds=None
+                )
         
-        # Final recommended limit
-        recommended_limit = min(
-            int(memory_based_limit * performance_factor),
-            5000  # Hard upper limit for safety
-        )
+    except Exception as e:
+        logger.error(f"Error starting background refresh: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start refresh: {str(e)}")
+
+@api_router.get("/cryptos/refresh-status", response_model=RefreshStatusResponse)
+async def get_refresh_status():
+    """Get the status of background refresh operations"""
+    try:
+        status_data = data_service.get_refresh_status()
         
-        # Ensure minimum viable limit
-        recommended_limit = max(recommended_limit, 100)
-        
-        # Performance impact assessment
-        if recommended_limit >= 2000:
-            performance_impact = "low"
-            memory_usage = "< 10MB estimated"
-        elif recommended_limit >= 1000:
-            performance_impact = "medium"
-            memory_usage = "5-10MB estimated"
-        else:
-            performance_impact = "high"
-            memory_usage = "< 5MB estimated"
-        
-        system_info = SystemResourcesInfo(
-            available_memory_mb=round(available_memory_mb, 2),
-            cpu_usage_percent=round(cpu_percent, 2),
-            recommended_max_cryptos=recommended_limit,
-            performance_mode=performance_mode,
-            current_load=current_load
-        )
-        
-        logger.info(f"Dynamic limit calculated: {recommended_limit} cryptos (Memory: {available_memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%)")
-        
-        return DynamicLimitResponse(
-            max_recommended_limit=recommended_limit,
-            performance_impact=performance_impact,
-            memory_usage_estimate=memory_usage,
-            system_resources=system_info
+        return RefreshStatusResponse(
+            status=status_data['status'],
+            active_tasks=status_data['active_tasks'],
+            last_update=status_data['last_update'],
+            last_duration_seconds=status_data['last_duration_seconds'],
+            last_error=status_data['last_error'],
+            next_auto_refresh=status_data['next_auto_refresh']
         )
         
     except Exception as e:
-        logger.error(f"Error calculating dynamic limit: {e}")
-        # Fallback to safe defaults
-        return DynamicLimitResponse(
-            max_recommended_limit=1000,
-            performance_impact="medium", 
-            memory_usage_estimate="< 5MB estimated",
-            system_resources=SystemResourcesInfo(
-                available_memory_mb=0.0,
-                cpu_usage_percent=0.0,
-                recommended_max_cryptos=1000,
-                performance_mode="balanced",
-                current_load="unknown"
-            )
-        )
+        logger.error(f"Error getting refresh status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/cryptos/refresh")
+async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
+    """LEGACY: Manual refresh cryptocurrency data - Now starts background refresh"""
+    try:
+        logger.info(f"Legacy refresh requested - redirecting to background refresh")
+        
+        # Start background refresh instead of blocking
+        task_id = await data_service.start_background_refresh(force_refresh=request.force)
+        
+        if task_id:
+            # Return immediately with background task info
+            return {
+                "status": "success",
+                "message": "Background refresh started",
+                "task_id": task_id,
+                "check_status_endpoint": "/api/cryptos/refresh-status",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            # Check if refresh is already running
+            refresh_status = data_service.get_refresh_status()
+            if refresh_status['status'] == 'running':
+                return {
+                    "status": "info",
+                    "message": "Background refresh already in progress",
+                    "check_status_endpoint": "/api/cryptos/refresh-status",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            else:
+                raise HTTPException(status_code=500, detail="Failed to start background refresh")
+        
+    except Exception as e:
+        logger.error(f"Error in legacy refresh endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start refresh: {str(e)}")
 
 # New CryptoRebound endpoints
 
