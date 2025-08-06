@@ -24,54 +24,59 @@ class DataAggregationService:
     """Service d'agrégation intelligent avec cache DB et enrichissement"""
     
     def __init__(self, db_client=None):
-        # Services de données
+        # Services de données - OPTIMISÉS POUR LA PERFORMANCE
         self.binance_service = BinanceService()
         self.yahoo_service = YahooFinanceService()
         self.fallback_service = FallbackCryptoService()
         self.cryptocompare_service = CryptoCompareService()
-        # NEW: Additional premium data sources
+        # Premium/High-performance data sources
         self.coinapi_service = CoinAPIService()
         self.coinpaprika_service = CoinPaprikaService()
         self.bitfinex_service = BitfinexService()
+        self.coinmarketcap_service = CoinMarketCapService()  # NEW: CoinMarketCap for premium data
         
         # Services de cache et enrichissement
         self.db_cache = DatabaseCacheService(db_client)
         self.enrichment_service = DataEnrichmentService(self.db_cache)
-        self.precompute_service = RankingPrecomputeService(self.db_cache, None)  # Will set scoring_service later
+        self.precompute_service = RankingPrecomputeService(self.db_cache, None)
         self.historical_price_service = HistoricalPriceService()
         
-        # Configuration
+        # Configuration optimisée pour la performance
         self.last_update = None
-        self.update_interval = timedelta(minutes=5)
-        self.target_crypto_count = 2000  # Increased target
-        self.max_analysis_limit = 5000  # Maximum cryptos that can be analyzed at once
+        self.update_interval = timedelta(minutes=3)  # Plus fréquent pour moins de latence
+        self.target_crypto_count = 3000  # Increased for better coverage
+        self.max_analysis_limit = 8000  # Increased maximum
+        
+        # Configuration de parallélisme améliorée
+        self.max_concurrent_requests = 15  # Plus de requêtes simultanées
+        self.request_semaphore = asyncio.Semaphore(self.max_concurrent_requests)
         
         # Smart caching configuration based on periods
         self.period_freshness_thresholds = {
-            '24h': timedelta(minutes=4.3),    # 0.3% of 24h = ~4.3 minutes
-            '7d': timedelta(minutes=30),      # 0.3% of 7 days = ~30 minutes
-            '30d': timedelta(hours=2.2),      # 0.3% of 30 days = ~2.2 hours
-            '1h': timedelta(seconds=11),      # 0.3% of 1h = ~11 seconds
-            'default': timedelta(minutes=5)   # Default threshold
+            '24h': timedelta(minutes=3),      # Plus agressif - 3 minutes au lieu de 4.3
+            '7d': timedelta(minutes=20),      # Plus agressif - 20 minutes au lieu de 30
+            '30d': timedelta(hours=1.5),      # Plus agressif - 1.5h au lieu de 2.2h
+            '1h': timedelta(seconds=8),       # Plus agressif - 8s au lieu de 11s
+            'default': timedelta(minutes=3)   # Plus agressif
         }
         
-        # Memory cache for recent data
+        # Memory cache optimisé
         self.memory_cache = {}
         self.memory_cache_timestamps = {}
-        self.max_memory_cache_age = timedelta(hours=1)  # Keep in memory for 1 hour max
+        self.max_memory_cache_age = timedelta(minutes=45)  # Cache plus long pour performance
         
         # Background refresh management
-        self.background_refresh_tasks = {}  # Track active background tasks
-        self.refresh_status = "idle"  # idle, running, completed, failed
+        self.background_refresh_tasks = {}
+        self.refresh_status = "idle"
         self.last_refresh_duration = None
         self.last_refresh_error = None
         
-        # Enhanced load balancing strategy with 7 APIs
+        # Load balancing strategy with 8 APIs - OPTIMISÉ
         self.load_balancing_thresholds = {
-            'small': 100,    # ≤ 100 cryptos: Use lightweight APIs
-            'medium': 500,   # ≤ 500 cryptos: Mixed strategy with multiple APIs  
-            'large': 1500,   # ≤ 1500 cryptos: Heavy APIs + comprehensive coverage
-            'xlarge': 5000   # > 1500 cryptos: All APIs with intelligent prioritization
+            'small': 150,     # Augmenté pour utiliser plus d'APIs
+            'medium': 700,    # Augmenté
+            'large': 2000,    # Augmenté
+            'xlarge': 8000    # Maximum élargi
         }
         
     
