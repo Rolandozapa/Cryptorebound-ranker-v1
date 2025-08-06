@@ -277,6 +277,8 @@ async def get_dynamic_analysis_limit():
         )
 
 # New CryptoRebound endpoints
+@api_router.get("/health")
+async def health_check():
     """Check the health of all data services"""
     health_status = data_service.is_healthy()
     return {
