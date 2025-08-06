@@ -106,31 +106,40 @@ user_problem_statement: "Improve the CryptoRebound application to remove the 100
 
 backend:
   - task: "Remove 1000 crypto hard limit from API validation"
-    implemented: false
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Removed le=1000 limit and increased to le=10000, added ge=1 and ge=0 for validation"
+
+  - task: "Add dynamic memory/token-aware analysis limit endpoint"
+    implemented: true
     working: "NA"
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
-    status_history: []
-
-  - task: "Add dynamic memory/token-aware analysis limit endpoint"
-    implemented: false
-    working: "NA" 
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main" 
+        comment: "Added /system/dynamic-limit endpoint with psutil monitoring, memory-based calculations, and performance recommendations"
 
   - task: "Update data aggregation to handle larger datasets efficiently"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "backend/services/data_aggregation_service.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Increased target_crypto_count to 2000, max_analysis_limit to 5000, improved batching from 100 to 200, dynamic fetch limits"
 
 frontend:
   - task: "Add max analyzing catch box UI component"
