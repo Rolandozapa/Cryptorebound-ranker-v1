@@ -536,7 +536,8 @@ class BackendTester:
         except Exception as e:
             self.log_test("Memory Cache Effectiveness", False, f"Exception: {str(e)}")
             return False
-        """Test individual API service integrations through health endpoint"""
+    def test_api_service_integrations(self):
+        """Test individual API service integrations through health endpoint including CoinMarketCap"""
         try:
             print("Testing individual API service integrations...")
             
@@ -550,16 +551,21 @@ class BackendTester:
             data = response.json()
             services = data.get('services', {})
             
-            # Test each new API service integration
-            new_services = {
-                'coinapi': 'CoinAPI (Premium)',
+            # Test each API service integration including CoinMarketCap
+            all_services = {
+                'coinmarketcap': 'CoinMarketCap (Priority 1)',
+                'cryptocompare': 'CryptoCompare (Priority 2)', 
+                'coinapi': 'CoinAPI (Priority 3)',
                 'coinpaprika': 'CoinPaprika (Free)',
-                'bitfinex': 'Bitfinex (Public)'
+                'bitfinex': 'Bitfinex (Public)',
+                'binance': 'Binance',
+                'yahoo_finance': 'Yahoo Finance',
+                'fallback': 'Fallback (CoinGecko/Coinlore)'
             }
             
             integration_results = {}
             
-            for service_key, service_name in new_services.items():
+            for service_key, service_name in all_services.items():
                 is_available = services.get(service_key, False)
                 
                 if is_available:
@@ -567,35 +573,17 @@ class BackendTester:
                     integration_results[service_key] = True
                 else:
                     # Check if it's a configuration issue vs integration issue
-                    if service_key == 'coinapi':
-                        self.log_test(f"API Integration - {service_name}", False, "Service unavailable - check COINAPI_KEY configuration")
+                    if service_key in ['coinapi', 'coinmarketcap']:
+                        self.log_test(f"API Integration - {service_name}", False, "Service unavailable - check API key configuration")
                     else:
                         self.log_test(f"API Integration - {service_name}", False, "Service unavailable - integration may have issues")
                     integration_results[service_key] = False
             
-            # Check existing services are still working
-            existing_services = {
-                'cryptocompare': 'CryptoCompare',
-                'binance': 'Binance',
-                'yahoo_finance': 'Yahoo Finance',
-                'fallback': 'Fallback (CoinGecko/Coinlore)'
-            }
-            
-            for service_key, service_name in existing_services.items():
-                is_available = services.get(service_key, False)
-                integration_results[service_key] = is_available
-                
-                if is_available:
-                    self.log_test(f"API Integration - {service_name}", True, "Existing service still working")
-                else:
-                    self.log_test(f"API Integration - {service_name}", False, "Existing service has issues")
-            
-            # Overall assessment
+            # Overall assessment - need at least 5 out of 8 services for optimized system
             total_services = len(integration_results)
             working_services = sum(1 for working in integration_results.values() if working)
             
-            # At least 4 out of 7 services should be working for a pass
-            if working_services >= 4:
+            if working_services >= 5:
                 self.log_test("API Service Integrations Overall", True, f"{working_services}/{total_services} services integrated and working")
                 return integration_results
             else:
