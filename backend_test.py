@@ -58,8 +58,8 @@ class BackendTester:
         if not success:
             self.failed_tests.append(test_name)
     
-    def test_health_endpoint_enhanced(self):
-        """Test the enhanced health check endpoint with 7 API services"""
+    def test_health_endpoint_with_8_apis(self):
+        """Test the enhanced health check endpoint with 8 API services including CoinMarketCap"""
         try:
             response = requests.get(f"{API_BASE}/health", timeout=10)
             
@@ -68,10 +68,10 @@ class BackendTester:
                 if data.get('status') == 'healthy':
                     services = data.get('services', {})
                     
-                    # Check for all 7 expected services
+                    # Check for all 8 expected services including CoinMarketCap
                     expected_services = [
-                        'cryptocompare', 'coinapi', 'coinpaprika', 'bitfinex',
-                        'binance', 'yahoo_finance', 'fallback'
+                        'coinmarketcap', 'cryptocompare', 'coinapi', 'coinpaprika', 
+                        'bitfinex', 'binance', 'yahoo_finance', 'fallback'
                     ]
                     
                     available_services = []
@@ -83,26 +83,26 @@ class BackendTester:
                         else:
                             unavailable_services.append(service)
                     
-                    details = f"Available: {len(available_services)}/7 services ({', '.join(available_services)})"
+                    details = f"Available: {len(available_services)}/8 services ({', '.join(available_services)})"
                     if unavailable_services:
                         details += f" | Unavailable: {', '.join(unavailable_services)}"
                     
-                    # Consider healthy if at least 4 services are available
-                    if len(available_services) >= 4:
-                        self.log_test("Enhanced Health Check (7 APIs)", True, details)
+                    # Consider healthy if at least 5 services are available (higher threshold for 8 APIs)
+                    if len(available_services) >= 5:
+                        self.log_test("Enhanced Health Check (8 APIs)", True, details)
                         return available_services
                     else:
-                        self.log_test("Enhanced Health Check (7 APIs)", False, f"Too few services available: {details}")
+                        self.log_test("Enhanced Health Check (8 APIs)", False, f"Too few services available: {details}")
                         return False
                 else:
-                    self.log_test("Enhanced Health Check (7 APIs)", False, f"Unhealthy status: {data}")
+                    self.log_test("Enhanced Health Check (8 APIs)", False, f"Unhealthy status: {data}")
                     return False
             else:
-                self.log_test("Enhanced Health Check (7 APIs)", False, f"HTTP {response.status_code}", response.text)
+                self.log_test("Enhanced Health Check (8 APIs)", False, f"HTTP {response.status_code}", response.text)
                 return False
                 
         except Exception as e:
-            self.log_test("Enhanced Health Check (7 APIs)", False, f"Exception: {str(e)}")
+            self.log_test("Enhanced Health Check (8 APIs)", False, f"Exception: {str(e)}")
             return False
     
     def test_intelligent_caching_system(self):
