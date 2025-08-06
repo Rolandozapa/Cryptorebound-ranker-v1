@@ -72,7 +72,7 @@ class BinanceService:
                     filtered_tickers.append({
                         'symbol': base_currency,
                         'full_symbol': symbol,
-                        'price': float(ticker['price']),
+                        'price_usd': float(ticker['price']),  # Correction: utiliser price_usd
                         'source': 'binance'
                     })
             
