@@ -8,7 +8,7 @@ from services.binance_service import BinanceService
 from services.yahoo_service import YahooFinanceService
 from services.fallback_crypto_service import FallbackCryptoService
 from services.database_cache_service import DatabaseCacheService
-from services.data_enrichment_service import DataEnrichmentService
+from services.ranking_precompute_service import RankingPrecomputeService
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class DataAggregationService:
         
         # Services de cache et enrichissement
         self.db_cache = DatabaseCacheService(db_client)
-        self.enrichment_service = DataEnrichmentService(self.db_cache)
+        self.enrichment_service = RankingPrecomputeService(self.db_cache)
         
         # Configuration
         self.last_update = None
