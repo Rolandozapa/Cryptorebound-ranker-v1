@@ -78,7 +78,7 @@ class DatabaseCacheService:
         Stocke les données crypto en DB après validation
         """
         try:
-            if not self.db:
+            if self.db is None:
                 logger.error("Database not initialized")
                 return False
             
