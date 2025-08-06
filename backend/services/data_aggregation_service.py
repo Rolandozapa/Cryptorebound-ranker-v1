@@ -425,23 +425,52 @@ class DataAggregationService:
     
     async def get_optimized_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False) -> List[CryptoCurrency]:
         """
-        Récupère le classement crypto de manière optimisée avec pré-calcul
+        Récupère le classement crypto de manière optimisée avec cache intelligent basé sur les périodes
         """
         try:
-            logger.info(f"Getting optimized ranking for {period} (limit: {limit}, offset: {offset})")
+            logger.info(f"Getting optimized ranking for {period} (limit: {limit}, offset: {offset}, force_refresh: {force_refresh})")
             
-            # Essayer d'abord le classement pré-calculé
-            if not force_refresh and hasattr(self, 'precompute_service'):
-                precomputed = await self.precompute_service.get_precomputed_ranking(period, limit, offset)
+            # Clean up expired memory cache
+            self._clean_memory_cache()
+            
+            # Check memory cache first (highest priority)
+            cache_key = f"ranking_{period}_{limit}_{offset}"
+            if not force_refresh:
+                memory_cached = self._get_memory_cached_data(cache_key)
+                if memory_cached:
+                    logger.info(f"Returning {len(memory_cached)} cryptos from memory cache")
+                    return memory_cached
+            
+            # Check if we should skip API calls based on period freshness
+            if not force_refresh and hasattr(self, 'precompute_service') and self.last_update:
+                if self._is_data_fresh_for_period(self.last_update, period):
+                    logger.info(f"Data is fresh enough for {period}, using precomputed ranking")
+                    
+                    # Try precomputed ranking with fresh data
+                    precomputed = await self.precompute_service.get_precomputed_ranking(period, limit, offset)
+                    if precomputed:
+                        # Cache in memory for future requests
+                        self._set_memory_cached_data(cache_key, precomputed)
+                        logger.info(f"Using precomputed ranking for {period}: {len(precomputed)} cryptos")
+                        return precomputed
+            
+            # If data is not fresh enough or precomputed not available, compute on demand
+            # But avoid heavy API calls if data was updated recently and we're in dev/intense activity
+            if (not force_refresh and 
+                self.last_update and 
+                (datetime.utcnow() - self.last_update) < timedelta(minutes=2)):
                 
-                if precomputed:
-                    logger.info(f"Using precomputed ranking for {period}: {len(precomputed)} cryptos")
-                    return precomputed
-                else:
-                    logger.info(f"No valid precomputed ranking for {period}, computing on demand")
+                logger.info("Recently updated data detected, preferring DB over fresh API calls")
+                result = await self._compute_ranking_on_demand_fast(period, limit, offset)
+            else:
+                # Normal computation with potential API refresh
+                result = await self._compute_ranking_on_demand(period, limit, offset)
             
-            # Fallback : calcul à la demande mais optimisé
-            return await self._compute_ranking_on_demand(period, limit, offset)
+            # Cache successful result in memory
+            if result:
+                self._set_memory_cached_data(cache_key, result)
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error getting optimized crypto ranking: {e}")
