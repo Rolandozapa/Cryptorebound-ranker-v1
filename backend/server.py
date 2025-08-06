@@ -265,11 +265,12 @@ async def get_multi_period_analysis(
         # Get data for LONG TERM periods 
         for period in long_periods:
             try:
-                period_cryptos = await data_service.get_optimized_crypto_ranking(
+                period_cryptos = await data_service.get_enhanced_crypto_ranking(
                     period=period, 
                     limit=200,  # Get more data for analysis
                     offset=0, 
-                    force_refresh=False
+                    force_refresh=False,
+                    fix_historical=True
                 )
                 
                 logger.info(f"Got {len(period_cryptos)} cryptos for LONG period {period}")
