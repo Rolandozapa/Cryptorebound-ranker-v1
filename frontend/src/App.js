@@ -34,6 +34,22 @@ const CryptoRebound = () => {
   const [systemResources, setSystemResources] = useState(null);
   const [loadingSystemInfo, setLoadingSystemInfo] = useState(false);
 
+  // Fetch system resources and dynamic limits
+  const fetchSystemResources = useCallback(async () => {
+    try {
+      setLoadingSystemInfo(true);
+      const response = await axios.get(`${API}/system/dynamic-limit`);
+      setSystemResources(response.data);
+      setMaxAnalysisLimit(response.data.max_recommended_limit);
+    } catch (err) {
+      console.error('Error fetching system resources:', err);
+      // Fallback to default if API fails
+      setMaxAnalysisLimit(1000);
+    } finally {
+      setLoadingSystemInfo(false);
+    }
+  }, []);
+
   // Fetch crypto ranking data
   const fetchCryptoRanking = useCallback(async (forceRefresh = false) => {
     try {
