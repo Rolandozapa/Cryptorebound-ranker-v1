@@ -481,57 +481,6 @@ async def get_performance_stats():
         logger.error(f"Error getting performance stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@api_router.post("/cryptos/refresh")
-async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
-    """Manually refresh cryptocurrency data"""
-    try:
-        logger.info(f"Manual refresh requested - Force: {request.force}")
-        
-        # Get fresh data
-        cryptos = await data_service.get_aggregated_crypto_data(force_refresh=request.force)
-        
-        if not cryptos:
-            raise HTTPException(status_code=503, detail="No cryptocurrency data available")
-        
-        # Calculate scores for all periods or specific period
-        periods_to_update = ['24h'] if request.period else ['1h', '24h', '7d', '30d']
-        
-        updated_rankings = {}
-        for period in periods_to_update:
-            scored_cryptos = scoring_service.calculate_scores(cryptos.copy(), period)
-            
-            # Cache the results
-            rankings_cache[period] = scored_cryptos
-            last_cache_update[period] = datetime.utcnow()
-            
-            # Save to database
-            ranking = CryptoRanking(
-                period=period,
-                cryptos=scored_cryptos,
-                total_cryptos=len(scored_cryptos),
-                refresh_count=1
-            )
-            await db.crypto_rankings.replace_one(
-                {"period": period},
-                ranking.dict(),
-                upsert=True
-            )
-            
-            updated_rankings[period] = len(scored_cryptos)
-        
-        logger.info(f"Successfully refreshed crypto data: {updated_rankings}")
-        
-        return {
-            "status": "success",
-            "message": f"Refreshed cryptocurrency data",
-            "updated_rankings": updated_rankings,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error refreshing crypto data: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to refresh data: {str(e)}")
-
 @api_router.get("/cryptos/ranking", response_model=List[CryptoCurrency])
 async def get_crypto_ranking(
     period: str = Query("24h", description="Time period for ranking"),
