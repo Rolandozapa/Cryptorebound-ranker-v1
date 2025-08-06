@@ -182,15 +182,18 @@ backend:
 
   - task: "Add environment variable for CoinAPI key"
     implemented: true
-    working: false
+    working: true
     file: "backend/.env"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added COINAPI_KEY environment variable with provided API key"
+      - working: true
+        agent: "testing"
+        comment: "TESTED: CoinAPI key (70046baa-e887-42ee-a909-03c6b6afab67) is properly configured and working. ✅ CoinAPI service shows as available in health endpoint. ✅ CoinMarketCap service also working with same key. ✅ Both key-based services (CoinAPI and CoinMarketCap) are operational and integrated. API key verification successful."
 
   - task: "Remove 1000 crypto hard limit from API validation"
     implemented: true
