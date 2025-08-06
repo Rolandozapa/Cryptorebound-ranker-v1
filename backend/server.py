@@ -33,6 +33,9 @@ api_router = APIRouter(prefix="/api")
 data_service = DataAggregationService(db_client=client)
 scoring_service = ScoringService()
 
+# Configure the scoring service for precomputation
+data_service.set_scoring_service(scoring_service)
+
 # Cache for rankings
 rankings_cache = {}
 last_cache_update = {}
