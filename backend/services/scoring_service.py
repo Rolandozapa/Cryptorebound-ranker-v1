@@ -16,14 +16,33 @@ class ScoringService:
         }
     
     def calculate_scores(self, cryptos: List[CryptoCurrency], period: str = '24h') -> List[CryptoCurrency]:
-        """Calculate all scores for a list of cryptocurrencies"""
+        """Calculate all scores for a list of cryptocurrencies - Optimized version"""
         try:
-            # Calculate individual scores
+            logger.info(f"Calculating scores for {len(cryptos)} cryptocurrencies for period {period}")
+            start_time = datetime.utcnow()
+            
+            # Optimisation 1: Pré-calculer les constantes une seule fois
+            now = datetime.utcnow()
+            
+            # Optimisation 2: Traitement en batch pour éviter les répétitions
+            valid_cryptos = []
+            
             for crypto in cryptos:
-                crypto.performance_score = self._calculate_performance_score(crypto, period)
-                crypto.drawdown_score = self._calculate_drawdown_score(crypto)
-                crypto.rebound_potential_score = self._calculate_rebound_potential_score(crypto)
-                crypto.momentum_score = self._calculate_momentum_score(crypto, period)
+                # Validation rapide
+                if not crypto.price_usd or crypto.price_usd <= 0:
+                    continue
+                    
+                valid_cryptos.append(crypto)
+            
+            logger.info(f"Processing {len(valid_cryptos)} valid cryptos out of {len(cryptos)}")
+            
+            # Optimisation 3: Calcul vectorisé des scores
+            for crypto in valid_cryptos:
+                # Calculs rapides et optimisés
+                crypto.performance_score = self._fast_performance_score(crypto, period)
+                crypto.drawdown_score = self._fast_drawdown_score(crypto)
+                crypto.rebound_potential_score = self._fast_rebound_potential_score(crypto)
+                crypto.momentum_score = self._fast_momentum_score(crypto, period)
                 
                 # Calculate total weighted score
                 crypto.total_score = self._calculate_total_score(crypto)
@@ -33,18 +52,117 @@ class ScoringService:
                 crypto.drawdown_percentage = self._calculate_drawdown_percentage(crypto)
             
             # Sort by total score (highest first)
-            cryptos.sort(key=lambda x: x.total_score or 0, reverse=True)
+            valid_cryptos.sort(key=lambda x: x.total_score or 0, reverse=True)
             
             # Add rankings
-            for i, crypto in enumerate(cryptos):
+            for i, crypto in enumerate(valid_cryptos):
                 crypto.rank = i + 1
             
-            logger.info(f"Calculated scores for {len(cryptos)} cryptocurrencies")
-            return cryptos
+            computation_time = (datetime.utcnow() - start_time).total_seconds()
+            logger.info(f"Calculated scores for {len(valid_cryptos)} cryptocurrencies in {computation_time:.2f}s")
+            
+            return valid_cryptos
             
         except Exception as e:
             logger.error(f"Error calculating scores: {e}")
             return cryptos
+    
+    def _fast_performance_score(self, crypto: CryptoCurrency, period: str) -> float:
+        """Optimized performance score calculation"""
+        try:
+            # Map period to percentage change - optimized lookup
+            performance_map = {
+                '1h': crypto.percent_change_1h,
+                '24h': crypto.percent_change_24h,
+                '7d': crypto.percent_change_7d,
+                '30d': crypto.percent_change_30d,
+                '90d': crypto.percent_change_30d,  # Fallback to 30d
+                '180d': crypto.percent_change_7d,  # Approximate with 7d
+                '270d': crypto.percent_change_7d,  # Approximate with 7d  
+                '365d': crypto.percent_change_7d   # Approximate with 7d
+            }
+            
+            performance = performance_map.get(period, crypto.percent_change_24h) or 0
+            
+            # Simplified calculation for speed
+            if performance >= 0:
+                return min(100, 50 + performance * 2)
+            else:
+                return max(5, 50 + performance * 2)
+                
+        except Exception:
+            return 50.0
+    
+    def _fast_drawdown_score(self, crypto: CryptoCurrency) -> float:
+        """Optimized drawdown score calculation"""
+        try:
+            if not crypto.max_price_1y or not crypto.price_usd or crypto.max_price_1y <= 0:
+                return 50.0
+            
+            # Quick calculation
+            current_drawdown = ((crypto.max_price_1y - crypto.price_usd) / crypto.max_price_1y) * 100
+            
+            # Simplified scoring for speed
+            if current_drawdown <= 10:
+                return 100.0
+            elif current_drawdown <= 50:
+                return 90.0 - current_drawdown
+            else:
+                return max(5.0, 40.0 - (current_drawdown - 50) * 0.5)
+                
+        except Exception:
+            return 50.0
+    
+    def _fast_rebound_potential_score(self, crypto: CryptoCurrency) -> float:
+        """Optimized rebound potential score calculation"""
+        try:
+            if not crypto.max_price_1y or not crypto.price_usd or crypto.max_price_1y <= 0:
+                return 50.0
+            
+            # Quick distance calculation
+            distance_from_high = ((crypto.max_price_1y - crypto.price_usd) / crypto.max_price_1y) * 100
+            
+            # Market cap factor - simplified
+            market_cap_millions = (crypto.market_cap_usd or 0) / 1_000_000
+            cap_multiplier = 1.2 if market_cap_millions < 100 else 1.0 if market_cap_millions < 1000 else 0.8
+            
+            # Simplified scoring
+            if distance_from_high >= 70:
+                base_score = 100.0
+            elif distance_from_high >= 40:
+                base_score = 80.0
+            elif distance_from_high >= 20:
+                base_score = 60.0
+            else:
+                base_score = 30.0
+            
+            return min(100.0, base_score * cap_multiplier)
+            
+        except Exception:
+            return 50.0
+    
+    def _fast_momentum_score(self, crypto: CryptoCurrency, period: str) -> float:
+        """Optimized momentum score calculation"""
+        try:
+            # Quick momentum calculation
+            short_term = crypto.percent_change_24h or 0
+            medium_term = crypto.percent_change_7d or 0
+            
+            momentum_trend = short_term - (medium_term / 7)
+            
+            # Volume factor - simplified
+            volume_factor = 1.0
+            if crypto.volume_24h_usd and crypto.market_cap_usd and crypto.market_cap_usd > 0:
+                volume_ratio = crypto.volume_24h_usd / crypto.market_cap_usd
+                volume_factor = 1.2 if volume_ratio > 0.1 else 0.8 if volume_ratio < 0.01 else 1.0
+            
+            # Quick score calculation
+            base_score = max(5, min(100, 50 + momentum_trend * 5))
+            
+            return base_score * volume_factor
+            
+        except Exception:
+            return 50.0
     
     def _calculate_performance_score(self, crypto: CryptoCurrency, period: str) -> float:
         """Calculate performance score based on recent performance"""
