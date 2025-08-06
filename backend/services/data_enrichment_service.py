@@ -399,7 +399,7 @@ class DataEnrichmentService:
     async def cleanup_old_tasks(self, days_old: int = 7):
         """Nettoie les anciennes tâches d'enrichissement"""
         try:
-            if not self.db_cache.db:
+            if self.db_cache.db is None:
                 return
             
             cutoff_date = datetime.utcnow() - timedelta(days=days_old)
