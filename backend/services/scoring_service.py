@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional, Any
 from models import CryptoCurrency
 import numpy as np
 from datetime import datetime
