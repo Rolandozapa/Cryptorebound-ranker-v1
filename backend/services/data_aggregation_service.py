@@ -30,7 +30,8 @@ class DataAggregationService:
         # Configuration
         self.last_update = None
         self.update_interval = timedelta(minutes=5)
-        self.target_crypto_count = 1500  # Objectif de cryptos à maintenir
+        self.target_crypto_count = 2000  # Increased target
+        self.max_analysis_limit = 5000  # Maximum cryptos that can be analyzed at once
         
     def set_scoring_service(self, scoring_service):
         """Configure the scoring service for precomputation"""
