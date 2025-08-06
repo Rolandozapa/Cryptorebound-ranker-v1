@@ -146,6 +146,21 @@ const CryptoRebound = () => {
     return 'text-red-500';
   };
 
+  // Get performance indicator color
+  const getPerformanceColor = (mode) => {
+    switch(mode) {
+      case 'maximum': return 'text-green-600';
+      case 'balanced': return 'text-yellow-600'; 
+      case 'optimal': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    fetchSystemResources();
+  }, [fetchSystemResources]);
+
   // Load initial data
   useEffect(() => {
     fetchCryptoRanking();
