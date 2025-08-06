@@ -476,7 +476,49 @@ class DataAggregationService:
             logger.error(f"Error getting optimized crypto ranking: {e}")
             return []
     
-    async def _compute_ranking_on_demand(self, period: str, limit: int, offset: int) -> List[CryptoCurrency]:
+    async def _compute_ranking_on_demand_fast(self, period: str, limit: int, offset: int) -> List[CryptoCurrency]:
+        """Calcule le classement rapidement en privilégiant les données DB (mode développement/activité intense)"""
+        try:
+            logger.info(f"Fast ranking computation for {period} (DB-preferred mode)")
+            
+            # Use existing cached data with extended limit for better results
+            dynamic_fetch_limit = min(
+                self.max_analysis_limit,
+                max(2000, (offset + limit) * 5)  # Get more data for better ranking quality
+            )
+            
+            logger.info(f"Using fast DB fetch limit: {dynamic_fetch_limit} cryptos")
+            
+            cached_cryptos = await self._get_cached_crypto_data_limited([], dynamic_fetch_limit)
+            
+            if len(cached_cryptos) < max(50, offset + limit):
+                logger.warning(f"Insufficient DB data ({len(cached_cryptos)} cryptos), falling back to minimal API refresh")
+                # Fallback to normal method if really insufficient data
+                return await self._compute_ranking_on_demand(period, limit, offset)
+            
+            # Convert to API format
+            api_cryptos = await self._convert_to_api_format(cached_cryptos)
+            
+            # Calculate scores with existing data
+            if hasattr(self, 'precompute_service') and self.precompute_service.scoring_service:
+                scored_cryptos = await self.precompute_service._optimized_scoring(api_cryptos, period)
+            else:
+                # Simple sorting by market cap if no scoring available
+                scored_cryptos = sorted(api_cryptos, key=lambda x: x.market_cap_usd or 0, reverse=True)
+                for i, crypto in enumerate(scored_cryptos):
+                    crypto.rank = i + 1
+            
+            # Apply pagination
+            end_index = offset + limit
+            result = scored_cryptos[offset:end_index]
+            
+            logger.info(f"Fast ranking completed for {period}: {len(result)} cryptos returned from DB")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in fast ranking computation: {e}")
+            # Fallback to normal method
+            return await self._compute_ranking_on_demand(period, limit, offset)
         """Calcule le classement à la demande de manière optimisée"""
         try:
             logger.info(f"Computing ranking on demand for {period}")
