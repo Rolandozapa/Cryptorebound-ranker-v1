@@ -194,7 +194,7 @@ class DatabaseCacheService:
     async def get_enrichment_tasks(self, limit: int = 50) -> List[EnrichmentTask]:
         """Récupère les tâches d'enrichissement en attente"""
         try:
-            if not self.db:
+            if self.db is None:
                 return []
             
             cursor = self.db.enrichment_tasks.find({
