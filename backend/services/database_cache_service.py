@@ -244,7 +244,7 @@ class DatabaseCacheService:
     async def get_best_sources_for_crypto(self, symbol: str) -> List[DataSource]:
         """Récupère les meilleures sources pour un crypto donné"""
         try:
-            if not self.db:
+            if self.db is None:
                 return [DataSource.COINGECKO, DataSource.YAHOO_FINANCE]
             
             cursor = self.db.quality_metrics.find({
