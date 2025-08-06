@@ -143,31 +143,40 @@ backend:
 
 frontend:
   - task: "Add max analyzing catch box UI component"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "frontend/src/App.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added dynamic analysis limit state, system resources display box, and fetchSystemResources function"
 
   - task: "Update display limit options for higher crypto counts"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "frontend/src/App.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added 2000, 3000, 5000 options and dynamic max limit option based on system capacity"
 
   - task: "Integrate dynamic limit fetching from backend"
-    implemented: false
+    implemented: true
     working: "NA"
     file: "frontend/src/App.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: false
-    status_history: []
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Integrated /system/dynamic-limit API call, respect maxAnalysisLimit in requests, added system validation"
 
 metadata:
   created_by: "main_agent"
