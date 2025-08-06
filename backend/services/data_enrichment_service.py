@@ -366,7 +366,7 @@ class DataEnrichmentService:
     async def schedule_enrichment_for_symbols(self, symbols: List[str], priority: int = 2):
         """Programme des tâches d'enrichissement pour une liste de symboles"""
         try:
-            if not self.db_cache.db:
+            if self.db_cache.db is None:
                 logger.error("Database not available for scheduling enrichment")
                 return
             
