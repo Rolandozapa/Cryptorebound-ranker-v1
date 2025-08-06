@@ -725,6 +725,32 @@ class BackendTester:
         # Test 8: Performance test
         performance_ok = self.test_system_performance()
         
+        # NEW ASYNC REFRESH TESTS
+        print("\n" + "=" * 80)
+        print("ASYNC REFRESH SYSTEM TESTS")
+        print("=" * 80)
+        
+        # Test 9: Async refresh endpoint
+        async_refresh_ok = self.test_async_refresh_endpoint()
+        
+        # Test 10: Async refresh with force
+        async_force_ok = self.test_async_refresh_with_force()
+        
+        # Test 11: Refresh status endpoint
+        status_endpoint_ok = self.test_refresh_status_endpoint()
+        
+        # Test 12: Legacy refresh endpoint (now async)
+        legacy_refresh_ok = self.test_legacy_refresh_endpoint()
+        
+        # Test 13: Complete async workflow
+        workflow_ok = self.test_async_workflow_complete()
+        
+        # Test 14: Multiple refresh requests handling
+        multiple_requests_ok = self.test_multiple_refresh_requests()
+        
+        # Test 15: Performance timing for async endpoints
+        async_performance_ok = self.test_async_performance_timing()
+        
         # Summary
         print("=" * 80)
         print("TEST SUMMARY")
@@ -739,6 +765,13 @@ class BackendTester:
         print(f"Failed: {failed_tests}")
         print(f"Success Rate: {(passed_tests/total_tests)*100:.1f}%")
         
+        # Async refresh specific summary
+        async_tests = [async_refresh_ok, async_force_ok, status_endpoint_ok, 
+                      legacy_refresh_ok, workflow_ok, multiple_requests_ok, async_performance_ok]
+        async_passed = sum(1 for test in async_tests if test)
+        
+        print(f"\nAsync Refresh System Tests: {async_passed}/{len(async_tests)} passed")
+        
         if self.failed_tests:
             print(f"\nFailed Tests:")
             for test in self.failed_tests:
@@ -746,9 +779,11 @@ class BackendTester:
         
         print("\n" + "=" * 80)
         
-        # Return overall success
+        # Return overall success - prioritize async refresh tests
         critical_tests = [health_ok, dynamic_max_limit, ranking_ok]
-        return all(critical_tests) and failed_tests == 0
+        async_critical = [async_refresh_ok, status_endpoint_ok, legacy_refresh_ok, async_performance_ok]
+        
+        return all(critical_tests) and all(async_critical) and failed_tests == 0
 
 if __name__ == "__main__":
     tester = BackendTester()
