@@ -27,13 +27,17 @@ class DataAggregationService:
         self.binance_service = BinanceService()
         self.yahoo_service = YahooFinanceService()
         self.fallback_service = FallbackCryptoService()
-        self.cryptocompare_service = CryptoCompareService()  # NEW RELIABLE SERVICE
+        self.cryptocompare_service = CryptoCompareService()
+        # NEW: Additional premium data sources
+        self.coinapi_service = CoinAPIService()
+        self.coinpaprika_service = CoinPaprikaService()
+        self.bitfinex_service = BitfinexService()
         
         # Services de cache et enrichissement
         self.db_cache = DatabaseCacheService(db_client)
         self.enrichment_service = DataEnrichmentService(self.db_cache)
         self.precompute_service = RankingPrecomputeService(self.db_cache, None)  # Will set scoring_service later
-        self.historical_price_service = HistoricalPriceService()  # NEW SERVICE
+        self.historical_price_service = HistoricalPriceService()
         
         # Configuration
         self.last_update = None
@@ -47,12 +51,12 @@ class DataAggregationService:
         self.last_refresh_duration = None
         self.last_refresh_error = None
         
-        # Load balancing strategy based on request size
+        # Enhanced load balancing strategy with 7 APIs
         self.load_balancing_thresholds = {
-            'small': 100,    # ≤ 100 cryptos: Use fallback APIs
-            'medium': 500,   # ≤ 500 cryptos: CryptoCompare + fallback  
-            'large': 1500,   # ≤ 1500 cryptos: CryptoCompare primary + others
-            'xlarge': 5000   # > 1500 cryptos: Full CryptoCompare + selective others
+            'small': 100,    # ≤ 100 cryptos: Use lightweight APIs
+            'medium': 500,   # ≤ 500 cryptos: Mixed strategy with multiple APIs  
+            'large': 1500,   # ≤ 1500 cryptos: Heavy APIs + comprehensive coverage
+            'xlarge': 5000   # > 1500 cryptos: All APIs with intelligent prioritization
         }
         
     
