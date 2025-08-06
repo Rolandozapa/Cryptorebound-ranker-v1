@@ -11,6 +11,7 @@ from services.cryptocompare_service import CryptoCompareService
 from services.coinapi_service import CoinAPIService
 from services.coinpaprika_service import CoinPaprikaService
 from services.bitfinex_service import BitfinexService
+from services.coinmarketcap_service import CoinMarketCapService
 from services.database_cache_service import DatabaseCacheService
 from services.data_enrichment_service import DataEnrichmentService
 from services.ranking_precompute_service import RankingPrecomputeService
