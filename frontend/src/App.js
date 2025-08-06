@@ -484,8 +484,8 @@ const CryptoRebound = () => {
                   </div>
                   <div>
                     <p><strong>🔥 Fort:</strong> Cohérence court/long terme</p>
-                    <p><strong>🚀 Accélère:</strong> Court terme > long terme</p>
-                    <p><strong>❄️ Ralentit:</strong> Long terme > court terme</p>
+                    <p><strong>🚀 Accélère:</strong> Court terme {">"} long terme</p>
+                    <p><strong>❄️ Ralentit:</strong> Long terme {">"} court terme</p>
                     <p><strong>⚠️ Divergent:</strong> Grande différence de tendances</p>
                   </div>
                 </div>
