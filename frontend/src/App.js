@@ -203,6 +203,27 @@ const CryptoRebound = () => {
     }
   };
 
+  // Multi-period analysis
+  const handleMultiPeriodAnalysis = async () => {
+    setMultiPeriodLoading(true);
+    try {
+      const response = await axios.get(`${API}/cryptos/multi-period-analysis`, {
+        params: {
+          limit: 15,
+          periods: ['24h', '7d', '30d']
+        }
+      });
+      
+      setMultiPeriodResults(response.data);
+      setShowMultiPeriodAnalysis(true);
+    } catch (err) {
+      console.error('Error fetching multi-period analysis:', err);
+      setError('Erreur lors de l\'analyse multi-périodes');
+    } finally {
+      setMultiPeriodLoading(false);
+    }
+  };
+
   // Get score color
   const getScoreColor = (score) => {
     if (score >= 90) return 'text-green-600 font-bold';
