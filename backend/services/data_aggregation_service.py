@@ -24,7 +24,8 @@ class DataAggregationService:
         
         # Services de cache et enrichissement
         self.db_cache = DatabaseCacheService(db_client)
-        self.enrichment_service = RankingPrecomputeService(self.db_cache)
+        self.enrichment_service = DataEnrichmentService(self.db_cache)
+        self.precompute_service = RankingPrecomputeService(self.db_cache, None)  # Will set scoring_service later
         
         # Configuration
         self.last_update = None
