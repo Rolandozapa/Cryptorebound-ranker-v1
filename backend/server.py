@@ -229,78 +229,30 @@ async def get_crypto_ranking(
     offset: int = Query(0, description="Offset for pagination"),
     force_refresh: bool = Query(False, description="Force refresh data")
 ):
-    """Get cryptocurrency ranking with advanced scoring"""
+    """Get cryptocurrency ranking with advanced scoring - OPTIMIZED VERSION"""
     try:
-        # Check cache first
-        cache_key = period
-        cache_age = None
+        logger.info(f"Getting crypto ranking: period={period}, limit={limit}, offset={offset}, force_refresh={force_refresh}")
         
-        if cache_key in last_cache_update:
-            cache_age = datetime.utcnow() - last_cache_update[cache_key]
-        
-        # Use cache if it's fresh (less than 10 minutes old) and no force refresh
-        if (not force_refresh and 
-            cache_key in rankings_cache and 
-            cache_age and 
-            cache_age < timedelta(minutes=10)):
-            
-            logger.info(f"Using cached ranking for {period} (age: {cache_age})")
-            cached_cryptos = rankings_cache[cache_key]
-            
-            # Apply pagination
-            end_index = offset + limit
-            result = cached_cryptos[offset:end_index]
-            
-            return result
-        
-        # Get fresh data
-        logger.info(f"Fetching fresh ranking for {period}")
-        
-        # Try to load from database first
-        db_ranking = await db.crypto_rankings.find_one({"period": period})
-        if db_ranking and not force_refresh:
-            stored_cryptos = [CryptoCurrency(**crypto) for crypto in db_ranking['cryptos']]
-            stored_age = datetime.utcnow() - db_ranking['last_updated']
-            
-            if stored_age < timedelta(minutes=15):  # Use stored data if less than 15 min old
-                logger.info(f"Using stored ranking for {period} (age: {stored_age})")
-                rankings_cache[cache_key] = stored_cryptos
-                last_cache_update[cache_key] = db_ranking['last_updated']
-                
-                end_index = offset + limit
-                return stored_cryptos[offset:end_index]
-        
-        # Need fresh data
-        cryptos = await data_service.get_aggregated_crypto_data(force_refresh=True)
-        
-        if not cryptos:
-            raise HTTPException(status_code=503, detail="No cryptocurrency data available")
-        
-        # Calculate scores
-        scored_cryptos = scoring_service.calculate_scores(cryptos, period)
-        
-        # Update cache
-        rankings_cache[cache_key] = scored_cryptos
-        last_cache_update[cache_key] = datetime.utcnow()
-        
-        # Save to database
-        ranking = CryptoRanking(
+        # Use optimized ranking method that leverages precomputation
+        result = await data_service.get_optimized_crypto_ranking(
             period=period,
-            cryptos=scored_cryptos,
-            total_cryptos=len(scored_cryptos)
-        )
-        await db.crypto_rankings.replace_one(
-            {"period": period},
-            ranking.dict(),
-            upsert=True
+            limit=limit, 
+            offset=offset,
+            force_refresh=force_refresh
         )
         
-        logger.info(f"Generated fresh ranking for {period}: {len(scored_cryptos)} cryptos")
+        if not result:
+            logger.warning(f"No ranking data available for {period}")
+            # Try fallback to basic aggregation
+            cryptos = await data_service.get_aggregated_crypto_data(force_refresh=True)
+            
+            if cryptos:
+                # Basic scoring and pagination
+                scored_cryptos = scoring_service.calculate_scores(cryptos[:500], period)  # Limit to 500 for performance
+                end_index = offset + limit
+                result = scored_cryptos[offset:end_index]
         
-        # Apply pagination
-        end_index = offset + limit
-        result = scored_cryptos[offset:end_index]
-        
+        logger.info(f"Returning {len(result)} ranked cryptocurrencies for {period}")
         return result
         
     except Exception as e:
