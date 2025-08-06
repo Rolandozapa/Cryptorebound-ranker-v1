@@ -59,7 +59,7 @@ const CryptoRebound = () => {
       const response = await axios.get(`${API}/cryptos/ranking`, {
         params: {
           period: selectedPeriod,
-          limit: displayLimit,
+          limit: Math.min(displayLimit, maxAnalysisLimit), // Respect dynamic limit
           offset: currentPage * displayLimit,
           force_refresh: forceRefresh
         }
