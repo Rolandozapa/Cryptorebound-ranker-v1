@@ -536,7 +536,7 @@ class DataAggregationService:
             if len(cached_cryptos) < 10:
                 # Pas assez de données en cache, fallback vers l'API
                 logger.info("Not enough cached data, falling back to API aggregation")
-                all_cryptos = await self.get_aggregated_crypto_data(force_refresh=True)
+                all_cryptos = await self.get_aggregated_crypto_data(force_refresh=True, period=period)
                 
                 # Calculer les scores si pas déjà fait
                 if hasattr(self, 'precompute_service') and self.precompute_service.scoring_service:
