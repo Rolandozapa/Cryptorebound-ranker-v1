@@ -1444,6 +1444,7 @@ class DataAggregationService:
             'coinapi': self.coinapi_service.is_available(),
             'coinpaprika': self.coinpaprika_service.is_available(),
             'bitfinex': self.bitfinex_service.is_available(),
+            'coinmarketcap': self.coinmarketcap_service.is_available(),
             'database_cache': self.db_cache.db is not None,
             'last_update': self.last_update.isoformat() if self.last_update else None
         }
