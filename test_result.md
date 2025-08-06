@@ -303,9 +303,8 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Add environment variable for CoinAPI key"
-  stuck_tasks:
-    - "Crypto data refresh performance optimization"
+    - "Optimized CryptoRebound backend testing completed"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
