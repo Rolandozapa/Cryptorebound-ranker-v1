@@ -340,6 +340,70 @@ class DataAggregationService:
             logger.error(f"Error fetching data from Bitfinex: {e}")
             return []
     
+    def _get_freshness_threshold_for_period(self, period: str) -> timedelta:
+        """Calculate freshness threshold based on period (0.3% of period duration)"""
+        return self.period_freshness_thresholds.get(period, self.period_freshness_thresholds['default'])
+    
+    def _is_data_fresh_for_period(self, last_updated: datetime, period: str) -> bool:
+        """Check if data is fresh enough for the given period"""
+        if not last_updated:
+            return False
+        
+        threshold = self._get_freshness_threshold_for_period(period)
+        time_since_update = datetime.utcnow() - last_updated
+        
+        is_fresh = time_since_update <= threshold
+        
+        if is_fresh:
+            logger.info(f"Data is fresh for period {period}: {time_since_update} <= {threshold}")
+        else:
+            logger.info(f"Data needs refresh for period {period}: {time_since_update} > {threshold}")
+        
+        return is_fresh
+    
+    def _get_memory_cached_data(self, cache_key: str) -> Optional[List]:
+        """Get data from memory cache if fresh"""
+        if cache_key not in self.memory_cache:
+            return None
+        
+        cache_timestamp = self.memory_cache_timestamps.get(cache_key)
+        if not cache_timestamp:
+            return None
+        
+        # Check if memory cache is still valid
+        if datetime.utcnow() - cache_timestamp > self.max_memory_cache_age:
+            # Clean up old cache
+            del self.memory_cache[cache_key]
+            del self.memory_cache_timestamps[cache_key]
+            return None
+        
+        logger.info(f"Using memory cached data for {cache_key}")
+        return self.memory_cache[cache_key]
+    
+    def _set_memory_cached_data(self, cache_key: str, data: List):
+        """Store data in memory cache"""
+        self.memory_cache[cache_key] = data
+        self.memory_cache_timestamps[cache_key] = datetime.utcnow()
+        logger.info(f"Cached {len(data) if data else 0} items in memory for {cache_key}")
+    
+    def _clean_memory_cache(self):
+        """Clean up expired memory cache entries"""
+        current_time = datetime.utcnow()
+        expired_keys = []
+        
+        for key, timestamp in self.memory_cache_timestamps.items():
+            if current_time - timestamp > self.max_memory_cache_age:
+                expired_keys.append(key)
+        
+        for key in expired_keys:
+            if key in self.memory_cache:
+                del self.memory_cache[key]
+            if key in self.memory_cache_timestamps:
+                del self.memory_cache_timestamps[key]
+        
+        if expired_keys:
+            logger.info(f"Cleaned up {len(expired_keys)} expired memory cache entries")
+
     def _get_source_distribution(self, crypto_list: List[Dict]) -> Dict[str, int]:
         """Get distribution of cryptocurrencies by primary source"""
         distribution = {}
