@@ -724,12 +724,13 @@ async def get_crypto_ranking(
     try:
         logger.info(f"Getting crypto ranking: period={period}, limit={limit}, offset={offset}, force_refresh={force_refresh}")
         
-        # Use optimized ranking method that leverages precomputation
-        result = await data_service.get_optimized_crypto_ranking(
+        # Use enhanced ranking with historical data correction
+        result = await data_service.get_enhanced_crypto_ranking(
             period=period,
             limit=limit, 
             offset=offset,
-            force_refresh=force_refresh
+            force_refresh=force_refresh,
+            fix_historical=fix_historical
         )
         
         if not result:
