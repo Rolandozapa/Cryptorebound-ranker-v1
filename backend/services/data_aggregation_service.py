@@ -32,9 +32,85 @@ class DataAggregationService:
         self.update_interval = timedelta(minutes=5)
         self.target_crypto_count = 1500  # Objectif de cryptos à maintenir
         
-    def set_db_client(self, db_client):
-        """Configure le client de base de données"""
-        self.db_cache.set_db_client(db_client)
+    def set_scoring_service(self, scoring_service):
+        """Configure the scoring service for precomputation"""
+        if hasattr(self, 'precompute_service') and self.precompute_service:
+            self.precompute_service.scoring_service = scoring_service
+    
+    async def get_optimized_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False) -> List[CryptoCurrency]:
+        """
+        Récupère le classement crypto de manière optimisée avec pré-calcul
+        """
+        try:
+            logger.info(f"Getting optimized ranking for {period} (limit: {limit}, offset: {offset})")
+            
+            # Essayer d'abord le classement pré-calculé
+            if not force_refresh and hasattr(self, 'precompute_service'):
+                precomputed = await self.precompute_service.get_precomputed_ranking(period, limit, offset)
+                
+                if precomputed:
+                    logger.info(f"Using precomputed ranking for {period}: {len(precomputed)} cryptos")
+                    return precomputed
+                else:
+                    logger.info(f"No valid precomputed ranking for {period}, computing on demand")
+            
+            # Fallback : calcul à la demande mais optimisé
+            return await self._compute_ranking_on_demand(period, limit, offset)
+            
+        except Exception as e:
+            logger.error(f"Error getting optimized crypto ranking: {e}")
+            return []
+    
+    async def _compute_ranking_on_demand(self, period: str, limit: int, offset: int) -> List[CryptoCurrency]:
+        """Calcule le classement à la demande de manière optimisée"""
+        try:
+            logger.info(f"Computing ranking on demand for {period}")
+            
+            # Récupérer seulement les cryptos nécessaires pour la pagination demandée
+            # On récupère un peu plus que nécessaire pour le tri, mais pas tout
+            fetch_limit = min(500, (offset + limit) * 2)  # Optimisation intelligente
+            
+            cached_cryptos = await self._get_cached_crypto_data_limited([], fetch_limit)
+            
+            if len(cached_cryptos) < 10:
+                # Pas assez de données en cache, fallback vers l'API
+                logger.info("Not enough cached data, falling back to API aggregation")
+                all_cryptos = await self.get_aggregated_crypto_data(force_refresh=True)
+                
+                # Calculer les scores si pas déjà fait
+                if hasattr(self, 'precompute_service') and self.precompute_service.scoring_service:
+                    scored_cryptos = await self.precompute_service._optimized_scoring(all_cryptos, period)
+                else:
+                    # Fallback basique si scoring service non disponible
+                    scored_cryptos = sorted(all_cryptos, key=lambda x: x.market_cap_usd or 0, reverse=True)
+                    for i, crypto in enumerate(scored_cryptos):
+                        crypto.rank = i + 1
+                
+                # Appliquer la pagination
+                end_index = offset + limit
+                return scored_cryptos[offset:end_index]
+            
+            # Convertir vers le format API et calculer les scores
+            api_cryptos = await self._convert_to_api_format(cached_cryptos)
+            
+            if hasattr(self, 'precompute_service') and self.precompute_service.scoring_service:
+                scored_cryptos = await self.precompute_service._optimized_scoring(api_cryptos, period)
+            else:
+                # Tri simple par market cap si pas de scoring
+                scored_cryptos = sorted(api_cryptos, key=lambda x: x.market_cap_usd or 0, reverse=True)
+                for i, crypto in enumerate(scored_cryptos):
+                    crypto.rank = i + 1
+            
+            # Appliquer la pagination
+            end_index = offset + limit
+            result = scored_cryptos[offset:end_index]
+            
+            logger.info(f"Computed ranking on demand for {period}: {len(result)} cryptos returned")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error computing ranking on demand: {e}")
+            return []
         
     async def get_aggregated_crypto_data(self, force_refresh: bool = False, required_fields: List[str] = None) -> List[CryptoCurrency]:
         """
