@@ -57,51 +57,368 @@ class BackendTester:
         if not success:
             self.failed_tests.append(test_name)
     
-    def test_health_endpoint_enhanced(self):
-        """Test the enhanced health check endpoint with 7 API services"""
+    def test_intelligent_caching_system(self):
+        """Test the period-based intelligent caching system"""
         try:
-            response = requests.get(f"{API_BASE}/health", timeout=10)
+            print("Testing intelligent caching system with different periods...")
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('status') == 'healthy':
-                    services = data.get('services', {})
-                    
-                    # Check for all 7 expected services
-                    expected_services = [
-                        'cryptocompare', 'coinapi', 'coinpaprika', 'bitfinex',
-                        'binance', 'yahoo_finance', 'fallback'
-                    ]
-                    
-                    available_services = []
-                    unavailable_services = []
-                    
-                    for service in expected_services:
-                        if services.get(service) == True:
-                            available_services.append(service)
-                        else:
-                            unavailable_services.append(service)
-                    
-                    details = f"Available: {len(available_services)}/7 services ({', '.join(available_services)})"
-                    if unavailable_services:
-                        details += f" | Unavailable: {', '.join(unavailable_services)}"
-                    
-                    # Consider healthy if at least 4 services are available
-                    if len(available_services) >= 4:
-                        self.log_test("Enhanced Health Check (7 APIs)", True, details)
-                        return available_services
-                    else:
-                        self.log_test("Enhanced Health Check (7 APIs)", False, f"Too few services available: {details}")
-                        return False
+            # Test different periods to verify caching thresholds
+            test_periods = ['24h', '7d', '30d']
+            cache_performance = {}
+            
+            for period in test_periods:
+                print(f"  Testing caching for period: {period}")
+                
+                # First request - should potentially hit APIs
+                start_time = time.time()
+                response1 = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'period': period, 'limit': 100},
+                    timeout=30
+                )
+                first_request_time = time.time() - start_time
+                
+                if response1.status_code != 200:
+                    self.log_test(f"Intelligent Caching - {period} (First Request)", False, f"HTTP {response1.status_code}")
+                    continue
+                
+                data1 = response1.json()
+                
+                # Second request immediately after - should use cache
+                start_time = time.time()
+                response2 = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'period': period, 'limit': 100},
+                    timeout=30
+                )
+                second_request_time = time.time() - start_time
+                
+                if response2.status_code != 200:
+                    self.log_test(f"Intelligent Caching - {period} (Second Request)", False, f"HTTP {response2.status_code}")
+                    continue
+                
+                data2 = response2.json()
+                
+                # Verify data consistency
+                if len(data1) != len(data2):
+                    self.log_test(f"Intelligent Caching - {period} (Consistency)", False, f"Data length mismatch: {len(data1)} vs {len(data2)}")
+                    continue
+                
+                # Check if second request was faster (indicating cache usage)
+                cache_speedup = first_request_time / max(second_request_time, 0.001)  # Avoid division by zero
+                
+                cache_performance[period] = {
+                    'first_time': first_request_time,
+                    'second_time': second_request_time,
+                    'speedup': cache_speedup,
+                    'data_count': len(data1)
+                }
+                
+                # Consider caching effective if second request is at least 20% faster
+                if cache_speedup >= 1.2 or second_request_time < 2.0:
+                    details = f"First: {first_request_time:.2f}s, Second: {second_request_time:.2f}s, Speedup: {cache_speedup:.1f}x, Data: {len(data1)} cryptos"
+                    self.log_test(f"Intelligent Caching - {period}", True, details)
                 else:
-                    self.log_test("Enhanced Health Check (7 APIs)", False, f"Unhealthy status: {data}")
-                    return False
+                    details = f"No significant caching benefit - First: {first_request_time:.2f}s, Second: {second_request_time:.2f}s"
+                    self.log_test(f"Intelligent Caching - {period}", False, details)
+            
+            # Overall caching assessment
+            successful_periods = sum(1 for p in cache_performance.values() if p['speedup'] >= 1.2 or p['second_time'] < 2.0)
+            
+            if successful_periods >= len(test_periods) // 2:
+                self.log_test("Intelligent Caching System Overall", True, f"Effective caching for {successful_periods}/{len(test_periods)} periods")
+                return True
             else:
-                self.log_test("Enhanced Health Check (7 APIs)", False, f"HTTP {response.status_code}", response.text)
+                self.log_test("Intelligent Caching System Overall", False, f"Ineffective caching - only {successful_periods}/{len(test_periods)} periods showed improvement")
                 return False
                 
         except Exception as e:
-            self.log_test("Enhanced Health Check (7 APIs)", False, f"Exception: {str(e)}")
+            self.log_test("Intelligent Caching System", False, f"Exception: {str(e)}")
+            return False
+
+    def test_data_aggregation_with_7_apis(self):
+        """Test enhanced data aggregation with 7 API sources"""
+        try:
+            print("Testing enhanced data aggregation with 7 API sources...")
+            
+            # Test different request sizes to verify load balancing strategies
+            test_sizes = [50, 200, 800, 1500]  # small, medium, large, xlarge
+            
+            successful_tests = 0
+            
+            for size in test_sizes:
+                print(f"  Testing aggregation with {size} cryptos...")
+                
+                start_time = time.time()
+                response = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'limit': size, 'period': '24h', 'force_refresh': True},
+                    timeout=60  # Longer timeout for large requests
+                )
+                request_time = time.time() - start_time
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if isinstance(data, list) and len(data) > 0:
+                        # Verify data quality
+                        valid_cryptos = 0
+                        for crypto in data:
+                            if (crypto.get('symbol') and 
+                                crypto.get('name') and 
+                                isinstance(crypto.get('price_usd'), (int, float)) and 
+                                crypto.get('price_usd', 0) > 0):
+                                valid_cryptos += 1
+                        
+                        data_quality = (valid_cryptos / len(data)) * 100
+                        
+                        # Performance assessment
+                        if request_time < 10:
+                            performance = "Excellent"
+                        elif request_time < 20:
+                            performance = "Good"
+                        elif request_time < 40:
+                            performance = "Acceptable"
+                        else:
+                            performance = "Slow"
+                        
+                        details = f"Size: {size}, Returned: {len(data)}, Quality: {data_quality:.1f}%, Time: {request_time:.2f}s ({performance})"
+                        
+                        if data_quality >= 80 and request_time < 45:
+                            self.log_test(f"Data Aggregation - {size} cryptos", True, details)
+                            successful_tests += 1
+                        else:
+                            self.log_test(f"Data Aggregation - {size} cryptos", False, details)
+                    else:
+                        self.log_test(f"Data Aggregation - {size} cryptos", False, "No valid data returned")
+                else:
+                    self.log_test(f"Data Aggregation - {size} cryptos", False, f"HTTP {response.status_code}")
+            
+            # Overall assessment
+            if successful_tests >= len(test_sizes) // 2:
+                self.log_test("Enhanced Data Aggregation (7 APIs)", True, f"Successful for {successful_tests}/{len(test_sizes)} request sizes")
+                return True
+            else:
+                self.log_test("Enhanced Data Aggregation (7 APIs)", False, f"Failed for most sizes - only {successful_tests}/{len(test_sizes)} successful")
+                return False
+                
+        except Exception as e:
+            self.log_test("Enhanced Data Aggregation (7 APIs)", False, f"Exception: {str(e)}")
+            return False
+
+    def test_api_service_integrations(self):
+        """Test individual API service integrations through health endpoint"""
+        try:
+            print("Testing individual API service integrations...")
+            
+            # Get health status to check individual services
+            response = requests.get(f"{API_BASE}/health", timeout=10)
+            
+            if response.status_code != 200:
+                self.log_test("API Service Integrations", False, f"Health endpoint failed: HTTP {response.status_code}")
+                return False
+            
+            data = response.json()
+            services = data.get('services', {})
+            
+            # Test each new API service integration
+            new_services = {
+                'coinapi': 'CoinAPI (Premium)',
+                'coinpaprika': 'CoinPaprika (Free)',
+                'bitfinex': 'Bitfinex (Public)'
+            }
+            
+            integration_results = {}
+            
+            for service_key, service_name in new_services.items():
+                is_available = services.get(service_key, False)
+                
+                if is_available:
+                    self.log_test(f"API Integration - {service_name}", True, "Service is available and integrated")
+                    integration_results[service_key] = True
+                else:
+                    # Check if it's a configuration issue vs integration issue
+                    if service_key == 'coinapi':
+                        self.log_test(f"API Integration - {service_name}", False, "Service unavailable - check COINAPI_KEY configuration")
+                    else:
+                        self.log_test(f"API Integration - {service_name}", False, "Service unavailable - integration may have issues")
+                    integration_results[service_key] = False
+            
+            # Check existing services are still working
+            existing_services = {
+                'cryptocompare': 'CryptoCompare',
+                'binance': 'Binance',
+                'yahoo_finance': 'Yahoo Finance',
+                'fallback': 'Fallback (CoinGecko/Coinlore)'
+            }
+            
+            for service_key, service_name in existing_services.items():
+                is_available = services.get(service_key, False)
+                integration_results[service_key] = is_available
+                
+                if is_available:
+                    self.log_test(f"API Integration - {service_name}", True, "Existing service still working")
+                else:
+                    self.log_test(f"API Integration - {service_name}", False, "Existing service has issues")
+            
+            # Overall assessment
+            total_services = len(integration_results)
+            working_services = sum(1 for working in integration_results.values() if working)
+            
+            # At least 4 out of 7 services should be working for a pass
+            if working_services >= 4:
+                self.log_test("API Service Integrations Overall", True, f"{working_services}/{total_services} services integrated and working")
+                return integration_results
+            else:
+                self.log_test("API Service Integrations Overall", False, f"Too few services working: {working_services}/{total_services}")
+                return False
+                
+        except Exception as e:
+            self.log_test("API Service Integrations", False, f"Exception: {str(e)}")
+            return False
+
+    def test_load_balancing_strategies(self):
+        """Test intelligent load balancing strategies for different request sizes"""
+        try:
+            print("Testing intelligent load balancing strategies...")
+            
+            # Test different strategies: small, medium, large, xlarge
+            strategy_tests = [
+                {'size': 50, 'strategy': 'small', 'expected_time': 15},
+                {'size': 300, 'strategy': 'medium', 'expected_time': 25},
+                {'size': 1000, 'strategy': 'large', 'expected_time': 35},
+                {'size': 2000, 'strategy': 'xlarge', 'expected_time': 50}
+            ]
+            
+            successful_strategies = 0
+            
+            for test in strategy_tests:
+                size = test['size']
+                strategy = test['strategy']
+                max_expected_time = test['expected_time']
+                
+                print(f"  Testing {strategy} strategy with {size} cryptos...")
+                
+                start_time = time.time()
+                response = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'limit': size, 'period': '24h'},
+                    timeout=max_expected_time + 10  # Add buffer to timeout
+                )
+                actual_time = time.time() - start_time
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if isinstance(data, list) and len(data) > 0:
+                        # Check if response time is within expected range
+                        if actual_time <= max_expected_time:
+                            performance_rating = "Excellent"
+                        elif actual_time <= max_expected_time * 1.5:
+                            performance_rating = "Good"
+                        else:
+                            performance_rating = "Slow"
+                        
+                        details = f"Strategy: {strategy}, Size: {size}, Returned: {len(data)}, Time: {actual_time:.2f}s ({performance_rating})"
+                        
+                        if actual_time <= max_expected_time * 1.5:  # Allow 50% buffer
+                            self.log_test(f"Load Balancing - {strategy.title()} Strategy", True, details)
+                            successful_strategies += 1
+                        else:
+                            self.log_test(f"Load Balancing - {strategy.title()} Strategy", False, f"{details} - Too slow")
+                    else:
+                        self.log_test(f"Load Balancing - {strategy.title()} Strategy", False, "No data returned")
+                else:
+                    self.log_test(f"Load Balancing - {strategy.title()} Strategy", False, f"HTTP {response.status_code}")
+            
+            # Overall assessment
+            if successful_strategies >= 3:  # At least 3 out of 4 strategies should work
+                self.log_test("Load Balancing Strategies Overall", True, f"{successful_strategies}/4 strategies working efficiently")
+                return True
+            else:
+                self.log_test("Load Balancing Strategies Overall", False, f"Only {successful_strategies}/4 strategies working")
+                return False
+                
+        except Exception as e:
+            self.log_test("Load Balancing Strategies", False, f"Exception: {str(e)}")
+            return False
+
+    def test_period_based_freshness_thresholds(self):
+        """Test period-based freshness thresholds (24h=4.3min, 7d=30min, 30d=2.2hrs)"""
+        try:
+            print("Testing period-based freshness thresholds...")
+            
+            # Test different periods to verify intelligent caching behavior
+            period_tests = [
+                {'period': '24h', 'threshold_desc': '4.3 minutes'},
+                {'period': '7d', 'threshold_desc': '30 minutes'},
+                {'period': '30d', 'threshold_desc': '2.2 hours'}
+            ]
+            
+            successful_tests = 0
+            
+            for test in period_tests:
+                period = test['period']
+                threshold_desc = test['threshold_desc']
+                
+                print(f"  Testing freshness threshold for {period} (threshold: {threshold_desc})...")
+                
+                # Make initial request
+                start_time = time.time()
+                response1 = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'period': period, 'limit': 100},
+                    timeout=30
+                )
+                first_time = time.time() - start_time
+                
+                if response1.status_code != 200:
+                    self.log_test(f"Freshness Threshold - {period}", False, f"Initial request failed: HTTP {response1.status_code}")
+                    continue
+                
+                # Make second request immediately (should use cache)
+                start_time = time.time()
+                response2 = requests.get(
+                    f"{API_BASE}/cryptos/ranking",
+                    params={'period': period, 'limit': 100},
+                    timeout=30
+                )
+                second_time = time.time() - start_time
+                
+                if response2.status_code != 200:
+                    self.log_test(f"Freshness Threshold - {period}", False, f"Second request failed: HTTP {response2.status_code}")
+                    continue
+                
+                # Verify caching behavior
+                data1 = response1.json()
+                data2 = response2.json()
+                
+                # Check data consistency
+                if len(data1) == len(data2):
+                    # Check if second request was faster (indicating cache usage)
+                    cache_improvement = first_time / max(second_time, 0.001)
+                    
+                    details = f"Period: {period}, Threshold: {threshold_desc}, First: {first_time:.2f}s, Second: {second_time:.2f}s, Improvement: {cache_improvement:.1f}x"
+                    
+                    # Consider successful if second request is faster or very fast
+                    if cache_improvement >= 1.5 or second_time < 1.0:
+                        self.log_test(f"Freshness Threshold - {period}", True, details)
+                        successful_tests += 1
+                    else:
+                        self.log_test(f"Freshness Threshold - {period}", False, f"{details} - No caching benefit")
+                else:
+                    self.log_test(f"Freshness Threshold - {period}", False, f"Data inconsistency: {len(data1)} vs {len(data2)} items")
+            
+            # Overall assessment
+            if successful_tests >= 2:  # At least 2 out of 3 periods should show proper caching
+                self.log_test("Period-Based Freshness Thresholds", True, f"{successful_tests}/3 periods showing intelligent caching")
+                return True
+            else:
+                self.log_test("Period-Based Freshness Thresholds", False, f"Only {successful_tests}/3 periods showing proper caching")
+                return False
+                
+        except Exception as e:
+            self.log_test("Period-Based Freshness Thresholds", False, f"Exception: {str(e)}")
             return False
     
     def test_dynamic_limit_endpoint(self):
