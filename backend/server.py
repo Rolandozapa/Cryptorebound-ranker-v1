@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import uuid
+import asyncio
 from datetime import datetime, timedelta
 
 # Import our new services and models
