@@ -8,6 +8,9 @@ from services.binance_service import BinanceService
 from services.yahoo_service import YahooFinanceService
 from services.fallback_crypto_service import FallbackCryptoService
 from services.cryptocompare_service import CryptoCompareService
+from services.coinapi_service import CoinAPIService
+from services.coinpaprika_service import CoinPaprikaService
+from services.bitfinex_service import BitfinexService
 from services.database_cache_service import DatabaseCacheService
 from services.data_enrichment_service import DataEnrichmentService
 from services.ranking_precompute_service import RankingPrecomputeService
