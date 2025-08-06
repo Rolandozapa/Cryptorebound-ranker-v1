@@ -236,11 +236,11 @@ class DataEnrichmentService:
                 if data.get('symbol', '').upper() == symbol.upper():
                     result = {'source': data.get('source', DataSource.COINGECKO)}
                     
-                    # Mapper les champs
+                    # Mapper les champs - maintenant les services utilisent directement les bons noms
                     field_mapping = {
-                        'price_usd': 'price',
-                        'market_cap_usd': 'market_cap',
-                        'volume_24h_usd': 'volume_24h',
+                        'price_usd': 'price_usd',  # Correction: maintenant direct
+                        'market_cap_usd': 'market_cap_usd',  # Correction: maintenant direct
+                        'volume_24h_usd': 'volume_24h_usd',  # Correction: maintenant direct
                         'percent_change_24h': 'percent_change_24h',
                         'percent_change_7d': 'percent_change_7d',
                         'percent_change_30d': 'percent_change_30d'
