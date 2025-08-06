@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from models import CryptoCurrency
 from services.binance_service import BinanceService
 from services.yahoo_service import YahooFinanceService
+from services.fallback_crypto_service import FallbackCryptoService
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,7 @@ class DataAggregationService:
     def __init__(self):
         self.binance_service = BinanceService()
         self.yahoo_service = YahooFinanceService()
+        self.fallback_service = FallbackCryptoService()
         self.last_update = None
         self.update_interval = timedelta(minutes=5)  # 5-minute minimum between updates
         
@@ -28,10 +30,22 @@ class DataAggregationService:
         logger.info("Starting data aggregation from multiple sources...")
         
         # Collect data from all sources concurrently
-        tasks = [
-            self._get_binance_data(),
-            self._get_yahoo_data()
-        ]
+        tasks = []
+        
+        # Add Binance if available
+        if self.binance_service.is_available():
+            tasks.append(self._get_binance_data())
+            logger.info("Added Binance data source")
+        else:
+            logger.info("Binance not available, skipping")
+        
+        # Add Yahoo Finance
+        tasks.append(self._get_yahoo_data())
+        logger.info("Added Yahoo Finance data source")
+        
+        # Add fallback sources (CoinGecko, Coinlore)
+        tasks.append(self._get_fallback_data())
+        logger.info("Added fallback data sources")
         
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -68,7 +82,7 @@ class DataAggregationService:
                 continue
         
         self.last_update = now
-        logger.info(f"Aggregated data for {len(cryptos)} cryptocurrencies")
+        logger.info(f"Aggregated data for {len(cryptos)} cryptocurrencies from {len([r for r in results if not isinstance(r, Exception)])} sources")
         return cryptos
     
     async def _get_binance_data(self) -> List[Dict[str, Any]]:
@@ -126,6 +140,17 @@ class DataAggregationService:
             logger.error(f"Error getting Yahoo data: {e}")
             return []
     
+    async def _get_fallback_data(self) -> List[Dict[str, Any]]:
+        """Get data from fallback sources"""
+        try:
+            data = await self.fallback_service.get_crypto_data(limit=1500)
+            logger.info(f"Retrieved {len(data)} items from fallback sources")
+            return data
+            
+        except Exception as e:
+            logger.error(f"Error getting fallback data: {e}")
+            return []
+    
     def _merge_crypto_data(self, existing: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
         """Merge two crypto data dictionaries, preferring non-null values"""
         merged = existing.copy()
@@ -133,6 +158,8 @@ class DataAggregationService:
         # Merge sources
         existing_sources = set(merged.get('data_sources', []))
         new_sources = set(new.get('data_sources', []))
+        if 'source' in existing:
+            existing_sources.add(existing['source'])
         if 'source' in new:
             new_sources.add(new['source'])
         merged['data_sources'] = list(existing_sources | new_sources)
@@ -142,9 +169,18 @@ class DataAggregationService:
             if value is not None and value != 0:
                 if key not in merged or merged[key] is None or merged[key] == 0:
                     merged[key] = value
-                elif key == 'price' and abs(value - merged[key]) < merged[key] * 0.1:
-                    # For price, average if they're close (within 10%)
-                    merged[key] = (merged[key] + value) / 2
+                elif key in ['price', 'market_cap', 'volume_24h'] and isinstance(value, (int, float)):
+                    # For numerical values, prefer the one that seems more reasonable
+                    existing_val = merged.get(key, 0)
+                    if isinstance(existing_val, (int, float)) and existing_val > 0:
+                        # If values are similar (within 20%), average them
+                        if abs(value - existing_val) < existing_val * 0.2:
+                            merged[key] = (existing_val + value) / 2
+                        # Otherwise, prefer the higher-quality source
+                        elif new.get('source') in ['binance', 'coingecko']:
+                            merged[key] = value
+                    else:
+                        merged[key] = value
         
         return merged
     
@@ -172,7 +208,8 @@ class DataAggregationService:
                 max_price_1y=self._safe_float(data.get('max_price_1y')),
                 min_price_1y=self._safe_float(data.get('min_price_1y')),
                 historical_prices=data.get('historical_prices', {}),
-                data_sources=data.get('data_sources', [])
+                data_sources=data.get('data_sources', []),
+                rank=data.get('rank')
             )
             
             return crypto
@@ -193,16 +230,33 @@ class DataAggregationService:
     async def get_historical_data_for_crypto(self, symbol: str) -> Dict[str, Any]:
         """Get detailed historical data for a specific cryptocurrency"""
         try:
+            tasks = []
+            
             # Try Binance first for more recent data
-            binance_data = await self.binance_service.get_historical_klines(symbol)
+            if self.binance_service.is_available():
+                tasks.append(self.binance_service.get_historical_klines(symbol))
             
             # Get Yahoo Finance data for longer historical period
-            yahoo_data = await self.yahoo_service.get_historical_data(symbol)
+            tasks.append(self.yahoo_service.get_historical_data(symbol))
+            
+            # Get fallback historical data
+            tasks.append(self.fallback_service.get_historical_data(symbol))
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            historical_data = {}
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    logger.warning(f"Historical data source {i} failed: {result}")
+                    continue
+                
+                if result:
+                    source_name = ['binance', 'yahoo', 'fallback'][i] if i < 3 else f'source_{i}'
+                    historical_data[f'{source_name}_historical'] = result
             
             return {
                 'symbol': symbol,
-                'binance_historical': binance_data,
-                'yahoo_historical': yahoo_data.to_dict('records') if yahoo_data is not None else [],
+                'historical_data': historical_data,
                 'last_updated': datetime.utcnow()
             }
             
@@ -215,5 +269,13 @@ class DataAggregationService:
         return {
             'binance': self.binance_service.is_available(),
             'yahoo_finance': self.yahoo_service.is_available(),
+            'fallback_sources': self.fallback_service.is_available(),
             'last_update': self.last_update.isoformat() if self.last_update else None
         }
+    
+    async def cleanup(self):
+        """Clean up resources"""
+        try:
+            await self.fallback_service.close()
+        except Exception as e:
+            logger.error(f"Error cleaning up resources: {e}")
