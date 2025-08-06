@@ -67,11 +67,15 @@ class DataAggregationService:
         try:
             logger.info(f"Computing ranking on demand for {period}")
             
-            # Récupérer seulement les cryptos nécessaires pour la pagination demandée
-            # On récupère un peu plus que nécessaire pour le tri, mais pas tout
-            fetch_limit = min(500, (offset + limit) * 2)  # Optimisation intelligente
+            # Dynamic limit calculation based on request size
+            dynamic_fetch_limit = min(
+                self.max_analysis_limit,  # System maximum
+                max(1000, (offset + limit) * 3)  # Smart scaling: get 3x what's needed for better ranking
+            )
             
-            cached_cryptos = await self._get_cached_crypto_data_limited([], fetch_limit)
+            logger.info(f"Using dynamic fetch limit: {dynamic_fetch_limit} cryptos")
+            
+            cached_cryptos = await self._get_cached_crypto_data_limited([], dynamic_fetch_limit)
             
             if len(cached_cryptos) < 10:
                 # Pas assez de données en cache, fallback vers l'API
