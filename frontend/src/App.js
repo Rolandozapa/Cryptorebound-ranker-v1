@@ -268,12 +268,17 @@ const CryptoRebound = () => {
             </div>
             
             <div className="flex items-center gap-4">
-              <span>Total cryptos: {totalCryptos}</span>
+              <span>Total cryptos: {totalCryptos.toLocaleString()}</span>
               <select
                 value={displayLimit}
                 onChange={(e) => {
-                  setDisplayLimit(parseInt(e.target.value));
-                  setCurrentPage(0);
+                  const newLimit = parseInt(e.target.value);
+                  if (newLimit <= maxAnalysisLimit) {
+                    setDisplayLimit(newLimit);
+                    setCurrentPage(0);
+                  } else {
+                    alert(`Limite maximum recommandée: ${maxAnalysisLimit.toLocaleString()} cryptos. Réduisez la valeur ou actualisez les ressources système.`);
+                  }
                 }}
                 className="px-2 py-1 border border-gray-300 rounded-md text-sm"
               >
@@ -282,7 +287,14 @@ const CryptoRebound = () => {
                 <option value={200}>200 cryptos</option>
                 <option value={500}>500 cryptos</option>
                 <option value={1000}>1000 cryptos</option>
+                <option value={2000}>2000 cryptos</option>
+                <option value={3000}>3000 cryptos</option>
+                {maxAnalysisLimit >= 5000 && <option value={5000}>5000 cryptos</option>}
+                {maxAnalysisLimit > 5000 && <option value={maxAnalysisLimit}>Max ({maxAnalysisLimit.toLocaleString()})</option>}
               </select>
+              {displayLimit > maxAnalysisLimit && (
+                <span className="text-xs text-red-500">⚠️ Limite dépassée</span>
+              )}
             </div>
           </div>
         </div>
