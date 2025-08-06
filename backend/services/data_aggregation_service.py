@@ -1214,6 +1214,10 @@ class DataAggregationService:
             'binance': self.binance_service.is_available(),
             'yahoo_finance': self.yahoo_service.is_available(),
             'fallback_sources': self.fallback_service.is_available(),
+            'cryptocompare': self.cryptocompare_service.is_available(),
+            'coinapi': self.coinapi_service.is_available(),
+            'coinpaprika': self.coinpaprika_service.is_available(),
+            'bitfinex': self.bitfinex_service.is_available(),
             'database_cache': self.db_cache.db is not None,
             'last_update': self.last_update.isoformat() if self.last_update else None
         }
