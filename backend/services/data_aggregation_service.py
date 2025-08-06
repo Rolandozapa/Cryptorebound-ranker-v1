@@ -44,6 +44,14 @@ class DataAggregationService:
         self.last_refresh_duration = None
         self.last_refresh_error = None
         
+        # Load balancing strategy based on request size
+        self.load_balancing_thresholds = {
+            'small': 100,    # ≤ 100 cryptos: Use fallback APIs
+            'medium': 500,   # ≤ 500 cryptos: CryptoCompare + fallback  
+            'large': 1500,   # ≤ 1500 cryptos: CryptoCompare primary + others
+            'xlarge': 5000   # > 1500 cryptos: Full CryptoCompare + selective others
+        }
+        
     
     async def start_background_refresh(self, force: bool = False, periods: List[str] = None) -> str:
         """Start background refresh and return task ID immediately"""
