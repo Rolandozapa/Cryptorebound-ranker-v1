@@ -87,10 +87,14 @@ class MultiPeriodCrypto(BaseModel):
     price_usd: float
     market_cap_usd: Optional[float] = None
     average_score: float
+    long_term_average: Optional[float] = None  # NEW: Average for 90d+180d+270d+365d
     period_scores: Dict[str, float]
+    long_term_scores: Optional[Dict[str, float]] = None  # NEW: Long term period scores
     best_period: str
     worst_period: str
     consistency_score: float
+    long_term_consistency: Optional[float] = None  # NEW: Consistency for long term
+    trend_confirmation: Optional[str] = None  # NEW: "Strong", "Weak", "Divergent"
     rank: int
 
 # Legacy endpoints for backwards compatibility
