@@ -196,3 +196,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Starting implementation to remove 1000 crypto limitation and add dynamic max analyzing catch box. Current system theoretically supports 1500+ cryptos but has artificial limits."
+  - agent: "main"
+    message: "Completed backend improvements: removed 1000 limit (now 10000), added /system/dynamic-limit endpoint with psutil monitoring, increased data aggregation targets to 2000-5000 cryptos, improved batching. Frontend: added dynamic analysis catch box UI, higher limit options (up to 5000), integrated system resource monitoring. Ready for testing."
