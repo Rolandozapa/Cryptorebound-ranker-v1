@@ -384,6 +384,57 @@ class DataAggregationService:
             logger.error(f"Error retrieving limited cached crypto data: {e}")
             return []
     
+    async def get_enhanced_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False, fix_historical_data: bool = True) -> List[CryptoCurrency]:
+        """Get crypto ranking with enhanced historical data accuracy"""
+        try:
+            logger.info(f"Getting enhanced crypto ranking for period {period}, limit {limit}, fix_historical_data={fix_historical_data}")
+            
+            # Get base ranking data
+            cryptos = await self.get_optimized_crypto_ranking(period, limit, offset, force_refresh)
+            
+            if not cryptos or not fix_historical_data:
+                return cryptos
+            
+            # Identify cryptos with missing or suspicious max_price_1y data
+            cryptos_needing_fix = []
+            for crypto in cryptos:
+                needs_fix = (
+                    not crypto.max_price_1y or 
+                    crypto.max_price_1y <= 0 or
+                    crypto.max_price_1y < crypto.price_usd or  # Max should be >= current
+                    crypto.max_price_1y < crypto.price_usd * 1.1  # Max should be significantly higher than current
+                )
+                
+                if needs_fix:
+                    cryptos_needing_fix.append(crypto)
+            
+            logger.info(f"Found {len(cryptos_needing_fix)}/{len(cryptos)} cryptos with potentially incorrect historical data")
+            
+            if cryptos_needing_fix:
+                # Update historical data for problematic cryptos
+                logger.info("Updating historical price data for cryptos with missing/incorrect max_price_1y")
+                updated_cryptos = await self.historical_price_service.batch_update_historical_data(cryptos_needing_fix)
+                
+                # Replace the updated cryptos in the original list
+                crypto_map = {crypto.symbol: crypto for crypto in updated_cryptos}
+                for i, crypto in enumerate(cryptos):
+                    if crypto.symbol in crypto_map:
+                        cryptos[i] = crypto_map[crypto.symbol]
+                
+                # Re-calculate scores with the corrected historical data
+                logger.info("Re-calculating scores with corrected historical data")
+                if hasattr(self, 'scoring_service') and self.scoring_service:
+                    cryptos = self.scoring_service.calculate_scores(cryptos, period)
+                
+                logger.info(f"Successfully updated historical data and recalculated scores for {len(cryptos_needing_fix)} cryptos")
+            
+            return cryptos
+            
+        except Exception as e:
+            logger.error(f"Error in enhanced crypto ranking: {e}")
+            # Fallback to basic ranking if enhancement fails
+            return await self.get_optimized_crypto_ranking(period, limit, offset, force_refresh)
+    
     def set_scoring_service(self, scoring_service):
         """Configure the scoring service for precomputation"""
         if hasattr(self, 'precompute_service') and self.precompute_service:
