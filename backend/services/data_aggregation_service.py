@@ -573,28 +573,45 @@ class DataAggregationService:
             logger.error(f"Error computing ranking on demand: {e}")
             return []
         
-    async def get_aggregated_crypto_data(self, force_refresh: bool = False, required_fields: List[str] = None, request_size: int = None) -> List[CryptoCurrency]:
+    async def get_aggregated_crypto_data(self, force_refresh: bool = False, required_fields: List[str] = None, request_size: int = None, period: str = '24h') -> List[CryptoCurrency]:
         """
-        Récupère les données crypto de manière intelligente : DB first, puis API si nécessaire
-        Enhanced with intelligent load balancing based on request size
+        Récupère les données crypto de manière intelligente avec cache basé sur les périodes
+        Enhanced with intelligent load balancing and period-based caching
         """
         try:
-            logger.info(f"Starting intelligent data aggregation (DB-first approach) for {request_size or 'unknown'} cryptos")
+            logger.info(f"Starting intelligent data aggregation for {request_size or 'unknown'} cryptos (period: {period})")
+            
+            # Clean up memory cache
+            self._clean_memory_cache()
+            
+            # Check if data is fresh enough for this period
+            skip_api_calls = False
+            if not force_refresh and self.last_update:
+                if self._is_data_fresh_for_period(self.last_update, period):
+                    skip_api_calls = True
+                    logger.info(f"Data is fresh for {period}, preferring DB over API calls")
             
             # 1. Récupérer les données depuis la DB d'abord
             cached_cryptos = await self._get_cached_crypto_data(required_fields or [])
             logger.info(f"Retrieved {len(cached_cryptos)} cryptocurrencies from cache")
             
-            # 2. Determine load balancing strategy based on request size
-            if request_size:
-                strategy = self._get_load_balancing_strategy(request_size)
-                logger.info(f"Using {strategy} strategy for {request_size} cryptos")
-            else:
-                strategy = 'medium'  # Default strategy
+            # 2. Determine if we need more data
+            need_more_data = (
+                force_refresh or 
+                len(cached_cryptos) < self.target_crypto_count or
+                (request_size and len(cached_cryptos) < request_size * 1.2)  # 20% buffer
+            )
             
-            # 3. Identifier les données manquantes ou obsolètes
-            if force_refresh or len(cached_cryptos) < self.target_crypto_count:
-                logger.info("Fetching fresh data from APIs to complement cache")
+            # 3. Only make API calls if data is not fresh or we really need more data
+            if need_more_data and not skip_api_calls:
+                logger.info("Making selective API calls to complement cache")
+                
+                # Determine load balancing strategy
+                if request_size:
+                    strategy = self._get_load_balancing_strategy(request_size)
+                    logger.info(f"Using {strategy} strategy for {request_size} cryptos")
+                else:
+                    strategy = 'medium'  # Default strategy
                 
                 # Use strategy-specific data fetching
                 fresh_data = await self._fetch_data_by_strategy(strategy, request_size)
@@ -611,21 +628,28 @@ class DataAggregationService:
                             continue
                     
                     logger.info(f"Stored {stored_count} new/updated cryptocurrencies in database")
+                    
+                    # Update last refresh time
+                    self.last_update = datetime.utcnow()
                 
-                # Re-récupérer les données mises à jour
+                # Re-fetch updated data from cache
                 cached_cryptos = await self._get_cached_crypto_data(required_fields or [])
+                
+            elif skip_api_calls:
+                logger.info(f"Skipping API calls - data is fresh enough for period {period}")
             
-            # 4. Programmer l'enrichissement en arrière-plan si nécessaire
-            await self._schedule_background_enrichment()
+            # 4. Programme l'enrichissement en arrière-plan si nécessaire (but not in intense activity)
+            if not skip_api_calls:
+                await self._schedule_background_enrichment()
             
             # 5. Convertir en format API
             api_cryptos = await self._convert_to_api_format(cached_cryptos)
             
-            logger.info(f"Data aggregation completed: {len(api_cryptos)} cryptocurrencies ready")
+            logger.info(f"Intelligent data aggregation completed: {len(api_cryptos)} cryptocurrencies ready")
             return api_cryptos
             
         except Exception as e:
-            logger.error(f"Error in data aggregation: {e}")
+            logger.error(f"Error in intelligent data aggregation: {e}")
             return []
     
     def _get_load_balancing_strategy(self, request_size: int) -> str:
