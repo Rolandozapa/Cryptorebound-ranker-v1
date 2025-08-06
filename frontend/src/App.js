@@ -28,6 +28,11 @@ const CryptoRebound = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [displayLimit, setDisplayLimit] = useState(50);
+  
+  // New state for dynamic analysis limits
+  const [maxAnalysisLimit, setMaxAnalysisLimit] = useState(1000);
+  const [systemResources, setSystemResources] = useState(null);
+  const [loadingSystemInfo, setLoadingSystemInfo] = useState(false);
 
   // Fetch crypto ranking data
   const fetchCryptoRanking = useCallback(async (forceRefresh = false) => {
