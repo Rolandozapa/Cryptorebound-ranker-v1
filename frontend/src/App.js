@@ -189,8 +189,48 @@ const CryptoRebound = () => {
             Découvrez les meilleures opportunités de rebond crypto basées sur notre algorithme de scoring avancé
           </p>
           <p className="text-sm text-blue-600 mb-6">
-            ✨ Optimisé pour les périodes longues - chargement accéléré !
+            ✨ Optimisé pour les périodes longues - chargement accéléré ! 🚀 Analyse dynamique jusqu'à {maxAnalysisLimit.toLocaleString()} cryptos
           </p>
+          
+          {/* Dynamic Analysis Limit Box */}
+          {systemResources && (
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                    🎯 Max Analyzing Catch Box - Limites Dynamiques
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-600">
+                    <div>
+                      <span className="font-medium">Limite Recommandée:</span>
+                      <div className="font-bold text-blue-600">{systemResources.max_recommended_limit.toLocaleString()} cryptos</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Mode Performance:</span>
+                      <div className={`font-bold ${getPerformanceColor(systemResources.system_resources.performance_mode)}`}>
+                        {systemResources.system_resources.performance_mode}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Mémoire Disponible:</span>
+                      <div className="font-bold text-green-600">{systemResources.system_resources.available_memory_mb.toFixed(0)} MB</div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Usage CPU:</span>
+                      <div className="font-bold text-purple-600">{systemResources.system_resources.cpu_usage_percent.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchSystemResources}
+                  disabled={loadingSystemInfo}
+                  className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 text-xs"
+                >
+                  {loadingSystemInfo ? '⟳' : '🔄'} Actualiser
+                </button>
+              </div>
+            </div>
+          )}
           
           {/* Period Selector */}
           <div className="flex flex-wrap gap-2 mb-4">
