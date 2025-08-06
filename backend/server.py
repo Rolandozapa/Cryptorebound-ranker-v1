@@ -162,7 +162,7 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
         logger.info(f"Legacy refresh requested - redirecting to background refresh")
         
         # Start background refresh instead of blocking
-        task_id = await data_service.start_background_refresh(force_refresh=request.force)
+        task_id = await data_service.start_background_refresh(force=request.force)
         
         if task_id:
             # Return immediately with background task info
