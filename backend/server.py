@@ -213,11 +213,12 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
 async def get_multi_period_analysis(
     limit: int = Query(15, description="Number of top cryptos to return", ge=5, le=50),
     short_periods: List[str] = Query(['24h', '7d', '30d'], description="Short-term periods to analyze"),
-    long_periods: List[str] = Query(['90d', '180d', '270d', '365d'], description="Long-term periods to analyze")
+    long_periods: List[str] = Query(['90d', '180d', '270d', '365d'], description="Long-term periods to analyze"),
+    fix_historical: bool = Query(False, description="Fix historical data (slower but more accurate)")
 ):
     """Get top cryptocurrencies analyzed across multiple periods with short/long term breakdown"""
     try:
-        logger.info(f"Starting multi-period analysis: {len(short_periods)} short + {len(long_periods)} long periods, top {limit}")
+        logger.info(f"Starting multi-period analysis: {len(short_periods)} short + {len(long_periods)} long periods, top {limit}, fix_historical={fix_historical}")
         
         # Dictionary to store all crypto data with scores from different periods
         crypto_scores = {}
@@ -230,7 +231,7 @@ async def get_multi_period_analysis(
                     limit=200,  # Get more data for analysis
                     offset=0, 
                     force_refresh=False,
-                    fix_historical=True
+                    fix_historical=fix_historical  # Use parameter value
                 )
                 
                 logger.info(f"Got {len(period_cryptos)} cryptos for SHORT period {period}")
