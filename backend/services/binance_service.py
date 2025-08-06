@@ -107,9 +107,9 @@ class BinanceService:
                     processed_stats.append({
                         'symbol': base_currency,
                         'full_symbol': symbol,
-                        'price': float(stat.get('lastPrice', 0)),
+                        'price_usd': float(stat.get('lastPrice', 0)),  # Correction: utiliser price_usd
                         'percent_change_24h': float(stat.get('priceChangePercent', 0)),
-                        'volume_24h': float(stat.get('volume', 0)),
+                        'volume_24h_usd': float(stat.get('volume', 0)),  # Correction: utiliser volume_24h_usd
                         'high_24h': float(stat.get('highPrice', 0)),
                         'low_24h': float(stat.get('lowPrice', 0)),
                         'source': 'binance'
