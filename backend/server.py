@@ -327,8 +327,8 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
 @api_router.get("/cryptos/ranking", response_model=List[CryptoCurrency])
 async def get_crypto_ranking(
     period: str = Query("24h", description="Time period for ranking"),
-    limit: int = Query(50, description="Number of results to return", le=1000),
-    offset: int = Query(0, description="Offset for pagination"),
+    limit: int = Query(50, description="Number of results to return", ge=1, le=10000),
+    offset: int = Query(0, description="Offset for pagination", ge=0),
     force_refresh: bool = Query(False, description="Force refresh data")
 ):
     """Get cryptocurrency ranking with advanced scoring - OPTIMIZED VERSION"""
