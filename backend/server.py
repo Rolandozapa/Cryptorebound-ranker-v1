@@ -271,7 +271,7 @@ async def get_multi_period_analysis(
                     limit=200,  # Get more data for analysis
                     offset=0, 
                     force_refresh=False,
-                    fix_historical=True
+                    fix_historical=fix_historical  # Use parameter value
                 )
                 
                 logger.info(f"Got {len(period_cryptos)} cryptos for LONG period {period}")
