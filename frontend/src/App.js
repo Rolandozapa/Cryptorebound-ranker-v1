@@ -351,6 +351,96 @@ const CryptoRebound = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Multi-Period Analysis Modal/Results */}
+        {showMultiPeriodAnalysis && (
+          <div className="bg-white rounded-lg shadow-lg border-2 border-purple-200 mb-6">
+            <div className="bg-purple-600 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+              <h2 className="text-xl font-bold">🏆 Top 15 Multi-Périodes - Analyse Globale</h2>
+              <button
+                onClick={() => setShowMultiPeriodAnalysis(false)}
+                className="text-white hover:text-gray-200 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Analyse des meilleures cryptomonnaies sur les périodes 24h, 7j et 30j combinées
+              </p>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-purple-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rang</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Crypto</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score Moyen</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Consistance</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meilleure Période</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scores Détaillés</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {multiPeriodResults.map((crypto) => (
+                      <tr key={crypto.symbol} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="text-lg font-bold text-purple-600">#{crypto.rank}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{crypto.symbol}</div>
+                            <div className="text-sm text-gray-500">{crypto.name}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(crypto.price_usd)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`text-sm font-bold ${getScoreColor(crypto.average_score)}`}>
+                            {crypto.average_score}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className={`text-sm font-medium ${
+                              crypto.consistency_score >= 80 ? 'text-green-600' :
+                              crypto.consistency_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {crypto.consistency_score}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {crypto.best_period}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs">
+                          {Object.entries(crypto.period_scores).map(([period, score]) => (
+                            <div key={period} className="flex justify-between">
+                              <span>{period}:</span>
+                              <span className="font-medium">{score.toFixed(1)}</span>
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="mt-4 text-sm text-gray-600">
+                <p><strong>Score Moyen:</strong> Moyenne des scores sur toutes les périodes analysées</p>
+                <p><strong>Consistance:</strong> Régularité des performances (100% = très stable)</p>
+                <p><strong>Meilleure Période:</strong> Période où la crypto performe le mieux</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
           📊 Classement {PERIODS.find(p => p.key === selectedPeriod)?.label} 
           ({Math.min(displayLimit, cryptos.length)} cryptos)
