@@ -105,17 +105,18 @@ class BackendTester:
             self.log_test("Enhanced Health Check (8 APIs)", False, f"Exception: {str(e)}")
             return False
     
-    def test_intelligent_caching_system(self):
-        """Test the period-based intelligent caching system"""
+    def test_optimized_caching_system(self):
+        """Test the optimized period-based intelligent caching system with improved thresholds"""
         try:
-            print("Testing intelligent caching system with different periods...")
+            print("Testing optimized caching system with improved thresholds...")
+            print("  Expected thresholds: 24h=3min, 7d=20min, 30d=1.5h")
             
-            # Test different periods to verify caching thresholds
+            # Test different periods to verify optimized caching thresholds
             test_periods = ['24h', '7d', '30d']
             cache_performance = {}
             
             for period in test_periods:
-                print(f"  Testing caching for period: {period}")
+                print(f"  Testing optimized caching for period: {period}")
                 
                 # First request - should potentially hit APIs
                 start_time = time.time()
@@ -127,7 +128,7 @@ class BackendTester:
                 first_request_time = time.time() - start_time
                 
                 if response1.status_code != 200:
-                    self.log_test(f"Intelligent Caching - {period} (First Request)", False, f"HTTP {response1.status_code}")
+                    self.log_test(f"Optimized Caching - {period} (First Request)", False, f"HTTP {response1.status_code}")
                     continue
                 
                 data1 = response1.json()
@@ -142,14 +143,14 @@ class BackendTester:
                 second_request_time = time.time() - start_time
                 
                 if response2.status_code != 200:
-                    self.log_test(f"Intelligent Caching - {period} (Second Request)", False, f"HTTP {response2.status_code}")
+                    self.log_test(f"Optimized Caching - {period} (Second Request)", False, f"HTTP {response2.status_code}")
                     continue
                 
                 data2 = response2.json()
                 
                 # Verify data consistency
                 if len(data1) != len(data2):
-                    self.log_test(f"Intelligent Caching - {period} (Consistency)", False, f"Data length mismatch: {len(data1)} vs {len(data2)}")
+                    self.log_test(f"Optimized Caching - {period} (Consistency)", False, f"Data length mismatch: {len(data1)} vs {len(data2)}")
                     continue
                 
                 # Check if second request was faster (indicating cache usage)
@@ -162,26 +163,26 @@ class BackendTester:
                     'data_count': len(data1)
                 }
                 
-                # Consider caching effective if second request is at least 20% faster
-                if cache_speedup >= 1.2 or second_request_time < 2.0:
+                # Consider caching effective if second request is at least 30% faster (higher threshold for optimized system)
+                if cache_speedup >= 1.3 or second_request_time < 1.5:
                     details = f"First: {first_request_time:.2f}s, Second: {second_request_time:.2f}s, Speedup: {cache_speedup:.1f}x, Data: {len(data1)} cryptos"
-                    self.log_test(f"Intelligent Caching - {period}", True, details)
+                    self.log_test(f"Optimized Caching - {period}", True, details)
                 else:
                     details = f"No significant caching benefit - First: {first_request_time:.2f}s, Second: {second_request_time:.2f}s"
-                    self.log_test(f"Intelligent Caching - {period}", False, details)
+                    self.log_test(f"Optimized Caching - {period}", False, details)
             
-            # Overall caching assessment
-            successful_periods = sum(1 for p in cache_performance.values() if p['speedup'] >= 1.2 or p['second_time'] < 2.0)
+            # Overall caching assessment - higher expectations for optimized system
+            successful_periods = sum(1 for p in cache_performance.values() if p['speedup'] >= 1.3 or p['second_time'] < 1.5)
             
             if successful_periods >= len(test_periods) // 2:
-                self.log_test("Intelligent Caching System Overall", True, f"Effective caching for {successful_periods}/{len(test_periods)} periods")
+                self.log_test("Optimized Caching System Overall", True, f"Effective optimized caching for {successful_periods}/{len(test_periods)} periods")
                 return True
             else:
-                self.log_test("Intelligent Caching System Overall", False, f"Ineffective caching - only {successful_periods}/{len(test_periods)} periods showed improvement")
+                self.log_test("Optimized Caching System Overall", False, f"Ineffective caching - only {successful_periods}/{len(test_periods)} periods showed improvement")
                 return False
                 
         except Exception as e:
-            self.log_test("Intelligent Caching System", False, f"Exception: {str(e)}")
+            self.log_test("Optimized Caching System", False, f"Exception: {str(e)}")
             return False
 
     def test_data_aggregation_with_7_apis(self):
