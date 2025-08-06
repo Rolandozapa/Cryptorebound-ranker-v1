@@ -734,7 +734,7 @@ async def get_crypto_ranking(
         )
         
         if not result:
-            logger.warning(f"No ranking data available for {period}")
+            logger.warning(f"No data returned from enhanced ranking, falling back to basic aggregation")
             # Try fallback to basic aggregation
             cryptos = await data_service.get_aggregated_crypto_data(force_refresh=True)
             
