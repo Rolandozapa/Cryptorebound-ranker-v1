@@ -91,7 +91,7 @@ class DataAggregationService:
     async def _get_cached_crypto_data(self, required_fields: List[str]) -> List[CryptoDataDB]:
         """Récupère les données crypto valides depuis le cache"""
         try:
-            if not self.db_cache.db:
+            if self.db_cache.db is None:
                 return []
             
             # Récupérer toutes les cryptos avec qualité acceptable
