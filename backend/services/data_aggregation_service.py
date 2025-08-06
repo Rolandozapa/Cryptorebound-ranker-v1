@@ -24,6 +24,7 @@ class DataAggregationService:
         self.binance_service = BinanceService()
         self.yahoo_service = YahooFinanceService()
         self.fallback_service = FallbackCryptoService()
+        self.cryptocompare_service = CryptoCompareService()  # NEW RELIABLE SERVICE
         
         # Services de cache et enrichissement
         self.db_cache = DatabaseCacheService(db_client)
