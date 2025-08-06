@@ -205,6 +205,125 @@ async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
 
 # New CryptoRebound endpoints
 
+@api_router.get("/cryptos/multi-period-analysis", response_model=List[MultiPeriodCrypto])
+async def get_multi_period_analysis(
+    limit: int = Query(15, description="Number of top cryptos to return", ge=5, le=50),
+    periods: List[str] = Query(['24h', '7d', '30d'], description="Periods to analyze")
+):
+    """Get top cryptocurrencies analyzed across multiple periods"""
+    try:
+        logger.info(f"Starting multi-period analysis for {len(periods)} periods, top {limit}")
+        
+        # Dictionary to store all crypto data with scores from different periods
+        crypto_scores = {}
+        
+        # Get data for each period
+        for period in periods:
+            try:
+                # Get ranking data for this period (larger sample for better analysis)
+                period_cryptos = await data_service.get_optimized_crypto_ranking(
+                    period=period, 
+                    limit=200,  # Get more data for analysis
+                    offset=0, 
+                    force_refresh=False
+                )
+                
+                logger.info(f"Got {len(period_cryptos)} cryptos for period {period}")
+                
+                # Process each crypto for this period
+                for crypto in period_cryptos:
+                    symbol = crypto.symbol
+                    
+                    if symbol not in crypto_scores:
+                        crypto_scores[symbol] = {
+                            'symbol': symbol,
+                            'name': crypto.name,
+                            'price_usd': crypto.price_usd,
+                            'market_cap_usd': crypto.market_cap_usd,
+                            'period_scores': {},
+                            'total_score': 0,
+                            'period_count': 0
+                        }
+                    
+                    # Add score for this period
+                    score = getattr(crypto, 'total_score', 0) or 0
+                    crypto_scores[symbol]['period_scores'][period] = score
+                    crypto_scores[symbol]['total_score'] += score
+                    crypto_scores[symbol]['period_count'] += 1
+                    
+            except Exception as e:
+                logger.warning(f"Error processing period {period}: {e}")
+                continue
+        
+        # Filter cryptos that appear in multiple periods for better consistency
+        min_periods = max(1, len(periods) // 2)  # At least half the periods
+        filtered_cryptos = {}
+        
+        for symbol, data in crypto_scores.items():
+            if data['period_count'] >= min_periods:
+                # Calculate average score
+                data['average_score'] = data['total_score'] / data['period_count']
+                
+                # Calculate consistency (lower std dev = more consistent)
+                scores = list(data['period_scores'].values())
+                if len(scores) > 1:
+                    mean_score = sum(scores) / len(scores)
+                    variance = sum((x - mean_score) ** 2 for x in scores) / len(scores)
+                    std_dev = variance ** 0.5
+                    # Consistency score (0-100, higher is better)
+                    max_possible_std = mean_score  # Maximum possible std dev
+                    data['consistency_score'] = max(0, 100 - (std_dev / max(max_possible_std, 1)) * 100)
+                else:
+                    data['consistency_score'] = 100  # Perfect consistency with one score
+                
+                # Find best and worst periods
+                if data['period_scores']:
+                    sorted_periods = sorted(data['period_scores'].items(), key=lambda x: x[1], reverse=True)
+                    data['best_period'] = sorted_periods[0][0]
+                    data['worst_period'] = sorted_periods[-1][0]
+                else:
+                    data['best_period'] = periods[0] if periods else 'unknown'
+                    data['worst_period'] = periods[0] if periods else 'unknown'
+                
+                filtered_cryptos[symbol] = data
+        
+        # Sort by average score (with consistency bonus)
+        sorted_cryptos = []
+        for symbol, data in filtered_cryptos.items():
+            # Give slight bonus for consistency (up to 5 points)
+            consistency_bonus = (data['consistency_score'] / 100) * 5
+            final_score = data['average_score'] + consistency_bonus
+            
+            sorted_cryptos.append((symbol, data, final_score))
+        
+        # Sort by final score and take top N
+        sorted_cryptos.sort(key=lambda x: x[2], reverse=True)
+        top_cryptos = sorted_cryptos[:limit]
+        
+        # Convert to response format
+        result = []
+        for rank, (symbol, data, final_score) in enumerate(top_cryptos, 1):
+            result.append(MultiPeriodCrypto(
+                symbol=symbol,
+                name=data['name'],
+                price_usd=data['price_usd'],
+                market_cap_usd=data['market_cap_usd'],
+                average_score=round(data['average_score'], 2),
+                period_scores=data['period_scores'],
+                best_period=data['best_period'],
+                worst_period=data['worst_period'],
+                consistency_score=round(data['consistency_score'], 1),
+                rank=rank
+            ))
+        
+        logger.info(f"Multi-period analysis completed: {len(result)} cryptos analyzed across {len(periods)} periods")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in multi-period analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Multi-period analysis failed: {str(e)}")
+
 @api_router.get("/system/dynamic-limit", response_model=DynamicLimitResponse)
 async def get_dynamic_analysis_limit():
     """Get dynamic analysis limit based on current system resources and memory"""
