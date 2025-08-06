@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for CryptoRebound Dynamic Analysis Limit Improvements
-Tests the new dynamic analysis limit functionality and higher crypto count support
+Backend API Testing for CryptoRebound Enhanced API Integrations and Intelligent Caching
+Tests the new CoinAPI, CoinPaprika, and Bitfinex integrations with period-based intelligent caching
 """
 
 import requests
