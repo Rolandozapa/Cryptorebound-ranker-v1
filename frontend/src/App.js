@@ -320,12 +320,16 @@ const CryptoRebound = () => {
               <span>Dernière mise à jour: {lastUpdate || 'Chargement...'}</span>
               <button
                 onClick={handleRefresh}
-                disabled={refreshing || loading}
+                disabled={refreshing || loading || refreshStatus === 'running'}
                 className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
-                {refreshing ? 'Actualisation...' : 'Actualiser'}
+                <span className={refreshing || refreshStatus === 'running' ? 'animate-spin' : ''}>🔄</span>
+                {refreshStatus === 'running' ? 'En cours...' : 
+                 refreshing ? 'Démarrage...' : 'Actualiser'}
               </button>
+              {refreshProgress && (
+                <span className="text-sm text-blue-600 ml-2">{refreshProgress}</span>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
