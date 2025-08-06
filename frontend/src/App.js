@@ -303,6 +303,14 @@ const CryptoRebound = () => {
                 {refreshStatus === 'running' ? 'En cours...' : 
                  refreshing ? 'Démarrage...' : 'Actualiser'}
               </button>
+              <button
+                onClick={handleMultiPeriodAnalysis}
+                disabled={multiPeriodLoading}
+                className="flex items-center gap-1 px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+              >
+                <span className={multiPeriodLoading ? 'animate-spin' : ''}>📊</span>
+                {multiPeriodLoading ? 'Analyse...' : 'Top 15 Multi-Périodes'}
+              </button>
               {refreshProgress && (
                 <span className="text-sm text-blue-600 ml-2">{refreshProgress}</span>
               )}
