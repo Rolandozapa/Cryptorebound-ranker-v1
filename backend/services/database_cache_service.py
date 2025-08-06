@@ -42,10 +42,9 @@ class DatabaseCacheService:
         Returns: CryptoDataDB si données valides, None si données expirées/manquantes
         """
         try:
-            if not self.db:
-                return None
+            if self.db is None:
+                return []
             
-            # Chercher dans la collection crypto_data
             doc = await self.db.crypto_data.find_one({"symbol": symbol.upper()})
             
             if not doc:
