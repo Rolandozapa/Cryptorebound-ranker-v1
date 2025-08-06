@@ -142,12 +142,13 @@ class DataAggregationService:
                 
                 logger.info(f"Found {len(missing_symbols)} missing cryptocurrencies")
                 
-                # Récupérer les données manquantes
+                # Récupérer les données manquantes (increase batch size)
                 if missing_symbols:
-                    await self._fetch_missing_crypto_data(missing_symbols[:100])  # Limiter à 100 par batch
+                    batch_size = min(200, len(missing_symbols))  # Increased from 100
+                    await self._fetch_missing_crypto_data(missing_symbols[:batch_size])
                 
-                # Identifier les données obsolètes
-                stale_symbols = await self.db_cache.get_stale_data_symbols(limit=50)
+                # Identifier les données obsolètes (increase limit)
+                stale_symbols = await self.db_cache.get_stale_data_symbols(limit=100)  # Increased from 50
                 if stale_symbols:
                     logger.info(f"Refreshing {len(stale_symbols)} stale cryptocurrencies")
                     await self._refresh_stale_data(stale_symbols)
