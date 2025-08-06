@@ -213,10 +213,10 @@ class DataEnrichmentService:
                 
                 if field in data:
                     result[field] = data[field]
-                elif field == 'price_usd' and 'price' in data:
-                    result['price_usd'] = data['price']
-                elif field == 'market_cap_usd' and 'market_cap' in data:
-                    result['market_cap_usd'] = data['market_cap']
+                elif field == 'price_usd' and 'price_usd' in data:  # Correction: maintenant direct
+                    result['price_usd'] = data['price_usd']
+                elif field == 'market_cap_usd' and 'market_cap_usd' in data:  # Correction: maintenant direct
+                    result['market_cap_usd'] = data['market_cap_usd']
                 
                 return result if len(result) > 1 else {}
             
