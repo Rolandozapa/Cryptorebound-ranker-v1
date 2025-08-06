@@ -172,6 +172,107 @@ async def _get_quality_recommendations(stats: Dict[str, Any]) -> List[str]:
     
     return recommendations
 
+@api_router.post("/ranking/precompute")
+async def trigger_ranking_precomputation(
+    periods: List[str] = Query([], description="Specific periods to precompute"),
+    background: bool = Query(True, description="Run in background")
+):
+    """Trigger precomputation of rankings for better performance"""
+    try:
+        if hasattr(data_service, 'precompute_service'):
+            precompute_service = data_service.precompute_service
+            
+            if not periods:
+                periods = ['24h', '7d', '30d', '90d', '180d', '270d', '365d']
+            
+            if background:
+                # Schedule background precomputation
+                asyncio.create_task(precompute_service.precompute_all_rankings())
+                
+                return {
+                    "status": "success", 
+                    "message": f"Scheduled precomputation for {len(periods)} periods in background",
+                    "periods": periods,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            else:
+                # Compute immediately (will be slower)
+                await precompute_service.precompute_all_rankings()
+                
+                return {
+                    "status": "success",
+                    "message": f"Completed precomputation for {len(periods)} periods",
+                    "periods": periods,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+        else:
+            raise HTTPException(status_code=501, detail="Precomputation service not available")
+            
+    except Exception as e:
+        logger.error(f"Error triggering ranking precomputation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/ranking/status")
+async def get_ranking_computation_status():
+    """Get the status of ranking computations"""
+    try:
+        if hasattr(data_service, 'precompute_service'):
+            precompute_service = data_service.precompute_service
+            status = precompute_service.get_computation_status()
+            
+            return {
+                "status": "success",
+                "computation_status": status,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        else:
+            return {
+                "status": "info",
+                "message": "Precomputation service not available",
+                "computation_status": {"periods_computing": [], "cache_status": {}},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            
+    except Exception as e:
+        logger.error(f"Error getting ranking computation status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/performance/stats")
+async def get_performance_stats():
+    """Get performance statistics for the application"""
+    try:
+        # Get database stats
+        db_stats = await data_service.get_database_stats()
+        
+        # Get service health
+        health_status = data_service.is_healthy()
+        
+        # Calculate performance metrics
+        total_cryptos = db_stats.get("total_cryptocurrencies", 0)
+        avg_quality = db_stats.get("average_quality_score", 0)
+        
+        performance_level = "excellent" if avg_quality >= 80 else "good" if avg_quality >= 60 else "fair"
+        
+        return {
+            "status": "success",
+            "performance_stats": {
+                "total_cryptocurrencies": total_cryptos,
+                "average_quality_score": avg_quality,
+                "performance_level": performance_level,
+                "database_stats": db_stats,
+                "services_health": health_status,
+                "optimization_recommendations": [
+                    "Consider running precomputation for periods 90d+" if avg_quality < 70 else "Performance is optimal",
+                    f"Database has {total_cryptos} cryptos - consider enrichment if below 1000" if total_cryptos < 1000 else "Good data coverage"
+                ]
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting performance stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/cryptos/refresh")
 async def refresh_crypto_data(request: RefreshRequest = RefreshRequest()):
     """Manually refresh cryptocurrency data"""
