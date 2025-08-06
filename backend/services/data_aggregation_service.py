@@ -384,15 +384,15 @@ class DataAggregationService:
             logger.error(f"Error retrieving limited cached crypto data: {e}")
             return []
     
-    async def get_enhanced_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False, fix_historical_data: bool = True) -> List[CryptoCurrency]:
+    async def get_enhanced_crypto_ranking(self, period: str = '24h', limit: int = 50, offset: int = 0, force_refresh: bool = False, fix_historical: bool = True) -> List[CryptoCurrency]:
         """Get crypto ranking with enhanced historical data accuracy"""
         try:
-            logger.info(f"Getting enhanced crypto ranking for period {period}, limit {limit}, fix_historical_data={fix_historical_data}")
+            logger.info(f"Getting enhanced crypto ranking for period {period}, limit {limit}, fix_historical={fix_historical}")
             
             # Get base ranking data
             cryptos = await self.get_optimized_crypto_ranking(period, limit, offset, force_refresh)
             
-            if not cryptos or not fix_historical_data:
+            if not cryptos or not fix_historical:
                 return cryptos
             
             # Identify cryptos with missing or suspicious max_price_1y data
