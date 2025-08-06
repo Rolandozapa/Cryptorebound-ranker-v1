@@ -171,11 +171,11 @@ class DataEnrichmentService:
                         result = {'source': DataSource.BINANCE}
                         
                         if field == 'price_usd':
-                            result['price_usd'] = stat.get('price')
+                            result['price_usd'] = stat.get('price_usd')  # Correction: maintenant direct
                         elif field == 'percent_change_24h':
                             result['percent_change_24h'] = stat.get('percent_change_24h')
                         elif field == 'volume_24h_usd':
-                            result['volume_24h_usd'] = stat.get('volume_24h')
+                            result['volume_24h_usd'] = stat.get('volume_24h_usd')  # Correction: maintenant direct
                         
                         return result
             
