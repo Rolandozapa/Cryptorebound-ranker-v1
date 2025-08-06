@@ -80,6 +80,11 @@ const CryptoRebound = () => {
     }
   }, [selectedPeriod, currentPage, displayLimit, maxAnalysisLimit]);
 
+  // New state for multi-period analysis
+  const [multiPeriodResults, setMultiPeriodResults] = useState([]);
+  const [showMultiPeriodAnalysis, setShowMultiPeriodAnalysis] = useState(false);
+  const [multiPeriodLoading, setMultiPeriodLoading] = useState(false);
+
   // New state for refresh status tracking
   const [refreshStatus, setRefreshStatus] = useState('idle');
   const [refreshProgress, setRefreshProgress] = useState('');
