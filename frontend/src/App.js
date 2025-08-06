@@ -78,7 +78,7 @@ const CryptoRebound = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedPeriod, currentPage, displayLimit]);
+  }, [selectedPeriod, currentPage, displayLimit, maxAnalysisLimit]);
 
   // Manual refresh
   const handleRefresh = async () => {
